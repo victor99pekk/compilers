@@ -9,15 +9,21 @@ public class BasicBlock {
     private List<IRInstruction> instructions;
     private Set<IRInstruction> reachingDefinitions;
     private Set<IRInstruction> outgoingDefinitions;
-    private Set<BasicBlock> childrenBlocks;
-    private Set<BasicBlock> parentBlocks;
+    // private Set<BasicBlock> childrenBlocks;
+    // private Set<BasicBlock> parentBlocks;
+    private int id;
 
-    public BasicBlock(List<IRInstruction> instructions) {
+    public BasicBlock(int id, List<IRInstruction> instructions) {
+        this.id = id;
         this.instructions = instructions;
         this.reachingDefinitions = new HashSet<>();
         this.outgoingDefinitions = new HashSet<>();
-        this.childrenBlocks = new HashSet<>();
-        this.parentBlocks = new HashSet<>();
+        // this.childrenBlocks = new HashSet<>();
+        // this.parentBlocks = new HashSet<>();
+    }
+
+    public int getId(){
+        return this.id;
     }
 
     public Set<IRInstruction> getReachingDefinitions() {
@@ -28,13 +34,13 @@ public class BasicBlock {
         return outgoingDefinitions;
     }
 
-    public Set<BasicBlock> getChildrenBlocks() {
-        return childrenBlocks;
-    }
+    // public Set<BasicBlock> getChildrenBlocks() {
+    //     return childrenBlocks;
+    // }
 
-    public Set<BasicBlock> getParentBlocks() {
-        return parentBlocks;
-    }
+    // public Set<BasicBlock> getParentBlocks() {
+    //     return parentBlocks;
+    // }
 
     public void addReachingDefinition(IRInstruction definition) {
         this.reachingDefinitions.add(definition);
@@ -44,18 +50,18 @@ public class BasicBlock {
         this.outgoingDefinitions.add(definition);
     }
 
-    private void addChildBlock(BasicBlock block) {
-        this.childrenBlocks.add(block);
-    }
+    // private void addChildBlock(BasicBlock block) {
+    //     this.childrenBlocks.add(block);
+    // }
 
-    private void addParentBlock(BasicBlock block) {
-        this.parentBlocks.add(block);
-    }
+    // private void addParentBlock(BasicBlock block) {
+    //     this.parentBlocks.add(block);
+    // }
 
-    public static void addEdge(BasicBlock parent, BasicBlock child) {
-        parent.addChildBlock(child);
-        child.addParentBlock(parent);
-    }
+    // public static void addEdge(BasicBlock parent, BasicBlock child) {
+    //     parent.addChildBlock(child);
+    //     child.addParentBlock(parent);
+    // }
 
     public List<IRInstruction> getInstructions() {
         return instructions;
