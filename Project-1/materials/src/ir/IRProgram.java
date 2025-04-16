@@ -14,5 +14,4 @@ public class IRProgram {
     public IRProgram(List<IRFunction> functions) {
         this.functions = functions;
     }
-
 }
