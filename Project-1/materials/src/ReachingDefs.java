@@ -41,7 +41,7 @@ import ir.IRInstruction;
     }
 
     private CFG cfg;
-    private Map<Integer, DataFlowSets> dfsMap;
+    private Map<BasicBlock, DataFlowSets> dfsMap;
 
     public ReachingDefs(CFG cfg) {
         this.cfg = cfg;
@@ -52,7 +52,8 @@ import ir.IRInstruction;
         Map<Integer, BasicBlock> basicBlocks = cfg.getBasicBlocks();
 
         for (Map.Entry<Integer, BasicBlock> entry : basicBlocks.entrySet()) {
-            dfsMap.put(entry.getKey(), new DataFlowSets());
+            BasicBlock bb = entry.getValue();
+            dfsMap.put(bb, new DataFlowSets());
         }
     }
 
@@ -75,6 +76,9 @@ import ir.IRInstruction;
 
     // returns true if definitions write to the same variable
     private boolean defsEqual(IRInstruction def1, IRInstruction def2) {
+        assert isDefinition(def1);
+        assert isDefinition(def2);
+
         if (def1.opCode == IRInstruction.OpCode.LABEL || def2.opCode == IRInstruction.OpCode.LABEL) {
             return false;
         }
@@ -105,8 +109,8 @@ import ir.IRInstruction;
         Map<Integer, BasicBlock> basicBlocks = cfg.getBasicBlocks();
 
         for (Map.Entry<Integer, BasicBlock> entry : basicBlocks.entrySet()) {
-            DataFlowSets dfs = dfsMap.get(entry.getKey());
             BasicBlock bb = entry.getValue();
+            DataFlowSets dfs = dfsMap.get(bb);
 
             for (IRInstruction instr : bb.getInstructions()) {
                 if (!isDefinition(instr))
@@ -122,8 +126,8 @@ import ir.IRInstruction;
         Map<Integer, BasicBlock> basicBlocks = cfg.getBasicBlocks();
 
         for (Map.Entry<Integer, BasicBlock> outer : basicBlocks.entrySet()) {
-            DataFlowSets dfs = dfsMap.get(outer.getKey());
             BasicBlock outer_bb = outer.getValue();
+            DataFlowSets dfs = dfsMap.get(outer_bb);
 
             for (Map.Entry<Integer, BasicBlock> inner : basicBlocks.entrySet()) {
                 BasicBlock inner_bb = inner.getValue();
@@ -145,7 +149,89 @@ import ir.IRInstruction;
         }
     }
 
+    private Set<IRInstruction> setDifference(Set<IRInstruction> set1, Set<IRInstruction> set2) {
+        Set<IRInstruction> diff = new HashSet<IRInstruction>();
+
+        for (IRInstruction instr1 : set1) {
+            boolean contains = false;
+
+            for (IRInstruction instr2 : set2) {
+                if (defsEqual(instr1, instr2)) {
+                    contains = true;
+                    break;
+                }
+            }
+
+            if (!contains)
+                diff.add(instr1);
+        }
+
+        return diff;
+    }
+
+    private Set<IRInstruction> setUnion(Set<IRInstruction> set1, Set<IRInstruction> set2) {
+        Set<IRInstruction> union = new HashSet<IRInstruction>();
+        union.addAll(set1);
+        union.addAll(set2);
+        return union;
+    }
+
+    private Set<IRInstruction> unionPredecessorsOuts(BasicBlock bb) {
+        Set<BasicBlock> predecessors = cfg.getIncomingEdges(bb);
+
+        Set<IRInstruction> newIn = new HashSet<IRInstruction>();
+        for (BasicBlock pred_bb : predecessors) {
+            Set<IRInstruction> pred_prev_out = dfsMap.get(pred_bb).PREV_OUT;
+            newIn = setUnion(newIn, pred_prev_out);
+        }
+
+        return newIn;
+    }
+
     private void findInAndOut() {
-        // TODO
+        while (true) {
+            for (Map.Entry<BasicBlock, DataFlowSets> bbSets : dfsMap.entrySet()) {
+                BasicBlock bb = bbSets.getKey();
+                DataFlowSets dfs = bbSets.getValue();
+
+                dfs.CURR_IN = unionPredecessorsOuts(bb);
+                dfs.CURR_OUT = setUnion(dfs.GEN, setDifference(dfs.PREV_IN, dfs.KILL));
+            }
+
+            boolean changed = false;
+            for (Map.Entry<BasicBlock, DataFlowSets> bbSets : dfsMap.entrySet()) {
+                DataFlowSets dfs = bbSets.getValue();
+                if ((!dfs.CURR_IN.equals(dfs.PREV_IN)) || (!dfs.CURR_OUT.equals(dfs.PREV_OUT))) {
+                    changed = true;
+                    break;
+                }
+            }
+
+            if (!changed)
+                break;
+        }
+    }
+
+    private void updateReachingDefs() {
+        for (Map.Entry<BasicBlock, DataFlowSets> bbSets : dfsMap.entrySet()) {
+            BasicBlock bb = bbSets.getKey();
+            DataFlowSets dfs = bbSets.getValue();
+
+            for (IRInstruction def : dfs.CURR_IN) {
+                bb.addReachingDefinition(def);
+            }
+
+            for (IRInstruction def : dfs.CURR_OUT) {
+                bb.addOutgoingDefinition(def);
+            }
+        }
+    }
+
+    public void findReachingDefs() {
+        initDfsMap();
+        findGen();
+        findKill();
+        findInAndOut();
+        updateReachingDefs();
     }
  }
