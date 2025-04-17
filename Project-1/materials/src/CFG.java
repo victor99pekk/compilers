@@ -12,7 +12,8 @@ public class CFG {
     private Map<BasicBlock, Set<BasicBlock>> outgoingEdges;
     private Map<BasicBlock, Set<BasicBlock>> incomingEdges;
 
-    public CFG() {
+    // Private constructor to enforce the use of the Builder
+    private CFG() {
         this.basicBlocks = new HashMap<>();
         this.leafBlocks = new HashSet<>();
         this.blockCounter = 0;
@@ -46,19 +47,48 @@ public class CFG {
         return leafBlocks;
     }
 
-    // Add an edge from one block to another
     public void addEdge(BasicBlock from, BasicBlock to) {
         outgoingEdges.computeIfAbsent(from, k -> new HashSet<>()).add(to);
         incomingEdges.computeIfAbsent(to, k -> new HashSet<>()).add(from);
     }
 
-    // Get outgoing edges for a block
     public Set<BasicBlock> getOutgoingEdges(BasicBlock block) {
         return outgoingEdges.getOrDefault(block, new HashSet<>());
     }
 
-    // Get incoming edges for a block
     public Set<BasicBlock> getIncomingEdges(BasicBlock block) {
         return incomingEdges.getOrDefault(block, new HashSet<>());
+    }
+
+    public static class Builder {
+        private CFG cfg;
+
+        public Builder() {
+            this.cfg = new CFG();
+        }
+
+        public Builder setStartBlock(BasicBlock startBlock) {
+            this.cfg.setStartBlock(startBlock);
+            return this;
+        }
+
+        public Builder addBasicBlock(BasicBlock block) {
+            this.cfg.addBasicBlock(block);
+            return this;
+        }
+
+        public Builder addLeafBlock(BasicBlock block) {
+            this.cfg.addLeafBlock(block);
+            return this;
+        }
+
+        public Builder addEdge(BasicBlock from, BasicBlock to) {
+            this.cfg.addEdge(from, to);
+            return this;
+        }
+
+        public CFG build() {
+            return this.cfg;
+        }
     }
 }
