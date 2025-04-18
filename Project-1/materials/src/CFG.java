@@ -33,78 +33,6 @@ public class CFG {
         // this.labelToLine = new HashMap<>();
     }
 
-    public static CFG mkCFG_copy(IRFunction func){
-
-        // program contains functions
-        // functions contains list of intructions
-        Builder cfgBuilder = new CFG.Builder();
-        Set<IRInstruction> headers = new HashSet<>();
-        Map<Integer, BasicBlock> lineToBlock = new HashMap<>();
-        Map<String, Integer> labelToLine = new HashMap<>();
-
-        List<IRInstruction> instrs = func.instructions;
-
-        // FIND HEADERS; INIT BASIC BLOCKS
-        for (int i = 0; i < instrs.size(); i++){ // Find headers
-            // check if instruction is a header
-            if (!isHeader(i, instrs)) {
-                continue;
-            }
-
-            IRInstruction inst = instrs.get(i);
-            headers.add(inst);
-
-            BasicBlock bb = new BasicBlock(inst.irLineNumber, new ArrayList<IRInstruction>());
-            bb.addInstruction(inst);
-            cfgBuilder.addBasicBlock(bb);
-            lineToBlock.put(inst.irLineNumber, bb);
-
-            if (isLabel(inst)) {
-                String label = inst.operands[0].toString();
-                labelToLine.put(label, inst.irLineNumber);
-            }
-        }
-
-        // POPULATE BASIC BLOCKS; CONNECT BASIC BLOCKS
-        int numInstrs = instrs.size();
-        for (IRInstruction headerInst : headers) {
-            int instrno = instrs.indexOf(headerInst);
-            assert instrno >= 0;
-
-            BasicBlock bb = lineToBlock.get(headerInst.irLineNumber);
-
-            // add instructions to bb; stop at the last instruction in bb
-            instrno++;
-            while (instrno < numInstrs && !isHeader(instrno, instrs)) {
-                IRInstruction i = instrs.get(instrno++);
-                bb.addInstruction(i);
-            }
-            instrno--;
-
-            // connect the basic blocks
-            IRInstruction lstInstr = instrs.get(instrno);
-            BasicBlock nextBb;
-            if (isBranch(lstInstr)) {
-                if (instrno + 1 < numInstrs) {
-                    nextBb = lineToBlock.get(lstInstr.irLineNumber + 1);
-                    cfgBuilder.addEdge(bb, nextBb);
-                }
-                String target = lstInstr.operands[1].toString();
-                nextBb = lineToBlock.get(labelToLine.get(target));
-                cfgBuilder.addEdge(bb, nextBb);
-            } else if (isGoto(lstInstr)) {
-                String target = lstInstr.operands[1].toString();
-                nextBb = lineToBlock.get(labelToLine.get(target));
-                cfgBuilder.addEdge(bb, nextBb);
-            } else if (instrno + 1 < numInstrs) {
-                nextBb = lineToBlock.get(lstInstr.irLineNumber + 1);
-                cfgBuilder.addEdge(bb, nextBb);
-            } 
-        }
-
-        return cfgBuilder.build();
-    }
-
     private static boolean isBranch(IRInstruction instr) {
         switch(instr.opCode) {
             case BREQ:
@@ -136,7 +64,7 @@ public class CFG {
 
         Builder cfgBuilder = new CFG.Builder();
         Set<IRInstruction> headers = new HashSet<>();
-        Map<Integer, BasicBlock> lineToBlock = new HashMap<>();
+        Map<Integer, BasicBlock> lineToBlock = new HashMap<>(); // irLineNumber to basic block
         Map<String, BasicBlock> labelToBlock = new HashMap<>();
 
         List<IRInstruction> instrs = func.instructions;
