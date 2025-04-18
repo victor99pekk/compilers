@@ -137,7 +137,7 @@ public class CFG {
         Builder cfgBuilder = new CFG.Builder();
         Set<IRInstruction> headers = new HashSet<>();
         Map<Integer, BasicBlock> lineToBlock = new HashMap<>();
-        Map<String, Integer> labelToLine = new HashMap<>();
+        Map<String, BasicBlock> labelToBlock = new HashMap<>();
 
         List<IRInstruction> instrs = func.instructions;
 
@@ -157,7 +157,7 @@ public class CFG {
 
             if (isLabel(inst)) {
                 String label = inst.operands[0].toString();
-                labelToLine.put(label, inst.irLineNumber);
+                labelToBlock.put(label, bb);
             }
         }
 
@@ -186,11 +186,11 @@ public class CFG {
                     cfgBuilder.addEdge(bb, nextBb);
                 }
                 String target = lstInstr.operands[1].toString();
-                nextBb = lineToBlock.get(labelToLine.get(target));
+                nextBb = labelToBlock.get(target);
                 cfgBuilder.addEdge(bb, nextBb);
             } else if (isGoto(lstInstr)) {
                 String target = lstInstr.operands[1].toString();
-                nextBb = lineToBlock.get(labelToLine.get(target));
+                nextBb = labelToBlock.get(target);
                 cfgBuilder.addEdge(bb, nextBb);
             } else if (instrno + 1 < numInstrs) {
                 nextBb = lineToBlock.get(lstInstr.irLineNumber + 1);
