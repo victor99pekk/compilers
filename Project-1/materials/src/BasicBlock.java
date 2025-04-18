@@ -26,6 +26,10 @@ public class BasicBlock {
         return this.id;
     }
 
+    public List<IRInstruction> geInstructions(){
+        return this.instructions;
+    }
+
     public Set<IRInstruction> getReachingDefinitions() {
         return reachingDefinitions;
     }
