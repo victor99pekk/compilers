@@ -13,14 +13,14 @@ import ir.operand.IROperand;
 public class CFG {
 
     private Map<Integer, BasicBlock> basicBlocks;
-    private Map<Integer, BasicBlock> lineToBlock;
+    // private Map<Integer, BasicBlock> lineToBlock;
     private BasicBlock startBlock;
     private Set<BasicBlock> leafBlocks;
     private int blockCounter;
     private Map<BasicBlock, Set<BasicBlock>> outgoingEdges;
     private Map<BasicBlock, Set<BasicBlock>> incomingEdges;
     private Set<BasicBlock> blocksInCFG;
-    private Map<String, Integer> labelToLine;
+    // private Map<String, Integer> labelToLine;
 
     // Private constructor to enforce the use of the Builder
     private CFG() {
@@ -30,57 +30,79 @@ public class CFG {
         this.outgoingEdges = new HashMap<>();
         this.incomingEdges = new HashMap<>();
         this.blocksInCFG = new HashSet<>();
-        this.labelToLine = new HashMap<>();
+        // this.labelToLine = new HashMap<>();
     }
 
-    public static CFG mkCFG_copy(IRFunction irProgram){
+    public static CFG mkCFG_copy(IRFunction func){
 
         // program contains functions
         // functions contains list of intructions
-        CFG cfg = new CFG.Builder().build();
+        Builder cfgBuilder = new CFG.Builder();
         Set<IRInstruction> headers = new HashSet<>();
-        for (IRFunction function : irProgram.functions){            // iterate functions
-            for (int i = 0; i < function.instructions.size(); i++){ // Find headers
-             // header if...
-                if (CFG.isHeader(i, function.instructions.get(i))) { // i == 0
-                    headers.add(function.instructions.get(i));
-                    BasicBlock bb = new Ba
-                    cfg.lineToBlock.put(function.instructions.get(i).irLineNumber, )
-                }
+        Map<Integer, BasicBlock> lineToBlock = new HashMap<>();
+        Map<String, Integer> labelToLine = new HashMap<>();
+
+        List<IRInstruction> instrs = func.instructions;
+
+        // FIND HEADERS; INIT BASIC BLOCKS
+        for (int i = 0; i < instrs.size(); i++){ // Find headers
+            // check if instruction is a header
+            if (!isHeader(i, instrs)) {
+                continue;
+            }
+
+            IRInstruction inst = instrs.get(i);
+            headers.add(inst);
+
+            BasicBlock bb = new BasicBlock(inst.irLineNumber, new ArrayList<IRInstruction>());
+            bb.addInstruction(inst);
+            cfgBuilder.addBasicBlock(bb);
+            lineToBlock.put(inst.irLineNumber, bb);
+
+            if (isLabel(inst)) {
+                String label = inst.operands[0].toString();
+                labelToLine.put(label, inst.irLineNumber);
             }
         }
 
-        // CREATE THE BASICBLOCKS
-        int basicBlockCounter = 0;
-        Set<BasicBlock> blocksInCFG = new HashSet<>();
-        for (IRFunction function : irProgram.functions){            // iterate functions
-            int instructionIndex = 0;
-            int functionLength = function.instructions.size();
-            while (instructionIndex < functionLength){
-                IRInstruction instruction = function.instructions.get(instructionIndex);
-                List<IRInstruction> instructionsInBlock = new ArrayList<>();
-                while (instructionIndex + 1 < functionLength && !CFG.isHeader(instructionIndex, instruction)){
-                    instructionsInBlock.add(instruction);
-                }
-                if (instructionIndex == functionLength) instructionsInBlock.add(instruction);
-                int LineNbrFirstInstruction = instructionsInBlock.get(0).irLineNumber;
-                BasicBlock basicBlock = new BasicBlock(LineNbrFirstInstruction, instructionsInBlock);
-                blocksInCFG.add(basicBlock);
+        // POPULATE BASIC BLOCKS; CONNECT BASIC BLOCKS
+        int numInstrs = instrs.size();
+        for (IRInstruction headerInst : headers) {
+            int instrno = instrs.indexOf(headerInst);
+            assert instrno >= 0;
+
+            BasicBlock bb = lineToBlock.get(headerInst.irLineNumber);
+
+            // add instructions to bb; stop at the last instruction in bb
+            instrno++;
+            while (instrno < numInstrs && !isHeader(instrno, instrs)) {
+                IRInstruction i = instrs.get(instrno++);
+                bb.addInstruction(i);
             }
+            instrno--;
+
+            // connect the basic blocks
+            IRInstruction lstInstr = instrs.get(instrno);
+            BasicBlock nextBb;
+            if (isBranch(lstInstr)) {
+                if (instrno + 1 < numInstrs) {
+                    nextBb = lineToBlock.get(lstInstr.irLineNumber + 1);
+                    cfgBuilder.addEdge(bb, nextBb);
+                }
+                String target = lstInstr.operands[1].toString();
+                nextBb = lineToBlock.get(labelToLine.get(target));
+                cfgBuilder.addEdge(bb, nextBb);
+            } else if (isGoto(lstInstr)) {
+                String target = lstInstr.operands[1].toString();
+                nextBb = lineToBlock.get(labelToLine.get(target));
+                cfgBuilder.addEdge(bb, nextBb);
+            } else if (instrno + 1 < numInstrs) {
+                nextBb = lineToBlock.get(lstInstr.irLineNumber + 1);
+                cfgBuilder.addEdge(bb, nextBb);
+            } 
         }
 
-        // CONNECT THE BASICBLOCK - NODES
-        // private Map<Integer, BasicBlock> basicBlocks;
-        for (BasicBlock basicBlock : blocksInCFG){
-            // find which block the lastline points to?
-            // we have a map<header - lineNBR, BasicBlock> that can be useful
-            // how do we kow what comes after the last line?
-            
-            // if last line is a goto, then the next line is the one it points to.
-            // else, it is
-        }
-
-        return null;
+        return cfgBuilder.build();
     }
 
     private static boolean isBranch(IRInstruction instr) {
@@ -97,64 +119,86 @@ public class CFG {
         }
     }
 
-    private static boolean isHeader(int i, IRInstruction instruction){
-        return (i == 0) || (instruction.opCode == IRInstruction.OpCode.LABEL) || (isBranch(instruction));
+    private static boolean isLabel(IRInstruction instr) {
+        return instr.opCode == IRInstruction.OpCode.LABEL;
     }
 
-    public static CFG mkCFG(IRFunction function){
+    private static boolean isGoto(IRInstruction instr) {
+        return instr.opCode == IRInstruction.OpCode.GOTO;
+    }
 
-        // program contains functions
-        // functions contains list of intructions
-        CFG cfg = new CFG.Builder().build();
+    private static boolean isHeader(int i, List<IRInstruction> instrs){
+        return (i == 0) || isLabel(instrs.get(i)) || (isBranch(instrs.get(i - 1)));
+    }
+
+    public static CFG mkCFG(IRFunction func) {
+        // basically a copy of the pseudocode from lecture 2, page 21
+
+        Builder cfgBuilder = new CFG.Builder();
         Set<IRInstruction> headers = new HashSet<>();
-        for (int i = 0; i < function.instructions.size(); i++){ // Find headers
-            // header if...
-            if (CFG.isHeader(i, function.instructions.get(i))) { // i == 0
-                headers.add(function.instructions.get(i));
-                
-                // cfg.lineToBlock.put(function.instructions.get(i).irLineNumber, )
+        Map<Integer, BasicBlock> lineToBlock = new HashMap<>();
+        Map<String, Integer> labelToLine = new HashMap<>();
+
+        List<IRInstruction> instrs = func.instructions;
+
+        // FIND HEADERS; INIT BASIC BLOCKS
+        for (int i = 0; i < instrs.size(); i++) {
+            if (!isHeader(i, instrs)) {
+                continue;
+            }
+
+            IRInstruction inst = instrs.get(i);
+            headers.add(inst);
+
+            BasicBlock bb = new BasicBlock(inst.irLineNumber, new ArrayList<IRInstruction>());
+            bb.addInstruction(inst);
+            cfgBuilder.addBasicBlock(bb);
+            lineToBlock.put(inst.irLineNumber, bb);
+
+            if (isLabel(inst)) {
+                String label = inst.operands[0].toString();
+                labelToLine.put(label, inst.irLineNumber);
             }
         }
 
-        // CREATE THE BASICBLOCKS
-        int basicBlockCounter = 0;
-        Set<BasicBlock> blocksInCFG = new HashSet<>();
-        int instructionIndex = 0;
-        int functionLength = function.instructions.size();
-        List<IRInstruction> instructionsInBlock = new ArrayList<>();
-        while (instructionIndex < functionLength){
-            IRInstruction instruction = function.instructions.get(instructionIndex);
-            while (instructionIndex + 1 < functionLength && !CFG.isHeader(instructionIndex, instruction)){
-                instructionsInBlock.add(instruction);
-            }
-            if (instructionIndex == functionLength) instructionsInBlock.add(instruction);
+        // POPULATE BASIC BLOCKS; CONNECT BASIC BLOCKS
+        int numInstrs = instrs.size();
+        for (IRInstruction headerInst : headers) {
+            int instrno = instrs.indexOf(headerInst);
+            assert instrno >= 0;
 
-            int LineNbrFirstInstruction = instructionsInBlock.get(0).irLineNumber;
-            BasicBlock basicBlock = new BasicBlock(LineNbrFirstInstruction, instructionsInBlock);
-            blocksInCFG.add(basicBlock);
-            instructionsInBlock.clear();
+            BasicBlock bb = lineToBlock.get(headerInst.irLineNumber);
+
+            // add instructions to bb; stop at the last instruction in bb
+            instrno++;
+            while (instrno < numInstrs && !isHeader(instrno, instrs)) {
+                IRInstruction i = instrs.get(instrno++);
+                bb.addInstruction(i);
+            }
+            instrno--;
+
+            // connect bb to other blocks
+            IRInstruction lstInstr = instrs.get(instrno);
+            BasicBlock nextBb;
+            if (isBranch(lstInstr)) {
+                if (instrno + 1 < numInstrs) {
+                    nextBb = lineToBlock.get(lstInstr.irLineNumber + 1);
+                    cfgBuilder.addEdge(bb, nextBb);
+                }
+                String target = lstInstr.operands[1].toString();
+                nextBb = lineToBlock.get(labelToLine.get(target));
+                cfgBuilder.addEdge(bb, nextBb);
+            } else if (isGoto(lstInstr)) {
+                String target = lstInstr.operands[1].toString();
+                nextBb = lineToBlock.get(labelToLine.get(target));
+                cfgBuilder.addEdge(bb, nextBb);
+            } else if (instrno + 1 < numInstrs) {
+                nextBb = lineToBlock.get(lstInstr.irLineNumber + 1);
+                cfgBuilder.addEdge(bb, nextBb);
+            } 
         }
 
-        // CONNECT THE BASICBLOCK - NODES
-        // private Map<Integer, BasicBlock> basicBlocks;
-        for (BasicBlock basicBlock : blocksInCFG){
-            // find which block the lastline points to?
-            // we have a map<header - lineNBR, BasicBlock> that can be useful
-            // how do we kow what comes after the last line?
-            
-            // if last line is a goto / branch, then the next edge points to the basicblock, whos address the goto points to
-            // else, it is consecutive line
-
-            IRInstruction instruction = basicBlock.getInstructions().getLast();
-            IRInstruction.OpCode operand = instruction.opCode;
-
-            if (operand == IRInstruction.OpCode.GOTO) {
-                String targetLabel = instruction.operands[0].toString();
-            }
-
-        }
-
-        return null;
+        return cfgBuilder.build();
     }
 
     public BasicBlock getStartBlock() {
