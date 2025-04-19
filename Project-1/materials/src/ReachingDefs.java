@@ -227,11 +227,13 @@ import ir.IRInstruction;
         }
     }
 
-    public void findReachingDefs() {
+    public CFG findReachingDefs() {
         initDfsMap();
         findGen();
         findKill();
         findInAndOut();
         updateReachingDefs();
+
+        return this.cfg;
     }
  }
