@@ -28,7 +28,7 @@ public class ProgramCFG {
         return null;
     }
 
-    public ProgramCFG compileWithOptimization(IRProgram program){
-        return new ProgramCFG(program).applyMarkSweep().convertToIRProgram();
-    }
+    // public ProgramCFG compileWithOptimization(IRProgram program){
+    //     return new ProgramCFG(program).applyMarkSweep().convertToIRProgram();
+    // }
 }
