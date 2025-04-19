@@ -24,8 +24,11 @@ public class ProgramCFG {
     }
 
     public IRProgram convertToIRProgram(){
-
-        return null;
+        IRProgram program = new IRProgram();
+        for (CFG cfg : cfgs) {
+            program.functions.add(CFG.mkFunction(cfg));
+        }
+        return program;
     }
 
     // public ProgramCFG compileWithOptimization(IRProgram program){

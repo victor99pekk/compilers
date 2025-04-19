@@ -8,19 +8,19 @@ import java.util.Set;
 import ir.IRFunction;
 import ir.IRInstruction;
 import ir.IRProgram;
+import ir.datatype.IRType;
 import ir.operand.IROperand;
+import ir.operand.IRVariableOperand;
 
 public class CFG {
 
     private Map<Integer, BasicBlock> basicBlocks;
-    // private Map<Integer, BasicBlock> lineToBlock;
     private BasicBlock startBlock;
     private Set<BasicBlock> leafBlocks;
     private int blockCounter;
     private Map<BasicBlock, Set<BasicBlock>> outgoingEdges;
     private Map<BasicBlock, Set<BasicBlock>> incomingEdges;
-    private Set<BasicBlock> blocksInCFG;
-    // private Map<String, Integer> labelToLine;
+    private IRFunction function; // the function from which the CFG is created
 
     // Private constructor to enforce the use of the Builder
     private CFG() {
@@ -29,8 +29,6 @@ public class CFG {
         this.blockCounter = 0;
         this.outgoingEdges = new HashMap<>();
         this.incomingEdges = new HashMap<>();
-        this.blocksInCFG = new HashSet<>();
-        // this.labelToLine = new HashMap<>();
     }
 
     private static boolean isBranch(IRInstruction instr) {
@@ -67,6 +65,7 @@ public class CFG {
         Map<Integer, BasicBlock> lineToBlock = new HashMap<>(); // irLineNumber to basic block
         Map<String, BasicBlock> labelToBlock = new HashMap<>();
 
+        cfgBuilder.addFunction(func);
         List<IRInstruction> instrs = func.instructions;
 
         // FIND HEADERS; INIT BASIC BLOCKS
@@ -127,6 +126,29 @@ public class CFG {
         }
 
         return cfgBuilder.build();
+    }
+
+    public static IRFunction mkFunction(CFG cfg) {
+        IRFunction function = cfg.getFunction();
+        function.instructions.clear(); // rewrite the optimized function
+        Map<Integer, BasicBlock> basicBlocks = cfg.getBasicBlocks();
+
+        for (Map.Entry<Integer, BasicBlock> outer : basicBlocks.entrySet()) {
+            BasicBlock bb = outer.getValue();
+            for (IRInstruction inst : bb.getInstructions()) {
+                function.instructions.add(inst);
+            }
+        }
+
+        return function;
+    }
+
+    public void addFunction(IRFunction function) {
+        this.function = function;
+    }
+
+    public IRFunction getFunction() {
+        return this.function;
     }
 
     public BasicBlock getStartBlock() {
@@ -192,6 +214,11 @@ public class CFG {
 
         public Builder addEdge(BasicBlock from, BasicBlock to) {
             this.cfg.addEdge(from, to);
+            return this;
+        }
+
+        public Builder addFunction(IRFunction function) {
+            this.cfg.addFunction(function);
             return this;
         }
 

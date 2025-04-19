@@ -1,5 +1,3 @@
-import java.io.PrintWriter;
-
 import ir.IRProgram;
 
 public class Optimizer {
@@ -7,19 +5,19 @@ public class Optimizer {
         String inputFile = args[0];
         String outputFile = args[1];
 
-        // // parse ir program
-        // IRProgram program = Converter.readProgram(inputFile);
-
-        // // optimize program
-        // ProgramCFG pcfg = new ProgramCFG(program);
-        // pcfg.applyMarkSweep();
-        // IRProgram optimizedProgram = pcfg.convertToIRProgram();
-
-        // // output optimizes ir program
-        // Converter.writeProgram(outputFile, optimizedProgram);
-
-        // test input and output
+        // parse ir program
         IRProgram program = Converter.readProgram(inputFile);
-        Converter.writeProgram(outputFile, program);
+
+        // optimize program
+        ProgramCFG pcfg = new ProgramCFG(program);
+        pcfg.applyMarkSweep();
+        IRProgram optimizedProgram = pcfg.convertToIRProgram();
+
+        // output optimizes ir program
+        Converter.writeProgram(outputFile, optimizedProgram);
+
+        // // test input and output
+        // IRProgram program = Converter.readProgram(inputFile);
+        // Converter.writeProgram(outputFile, program);
     }
 }
