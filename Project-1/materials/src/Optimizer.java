@@ -7,15 +7,19 @@ public class Optimizer {
         String inputFile = args[0];
         String outputFile = args[1];
 
-        // parse ir program
+        // // parse ir program
+        // IRProgram program = Converter.readProgram(inputFile);
+
+        // // optimize program
+        // ProgramCFG pcfg = new ProgramCFG(program);
+        // pcfg.applyMarkSweep();
+        // IRProgram optimizedProgram = pcfg.convertToIRProgram();
+
+        // // output optimizes ir program
+        // Converter.writeProgram(outputFile, optimizedProgram);
+
+        // test input and output
         IRProgram program = Converter.readProgram(inputFile);
-
-        // optimize program
-        ProgramCFG pcfg = new ProgramCFG(program);
-        pcfg.applyMarkSweep();
-        IRProgram optimizedProgram = pcfg.convertToIRProgram();
-
-        // output optimizes ir program
-        Converter.writeProgram(outputFile, optimizedProgram);
+        Converter.writeProgram(outputFile, program);
     }
 }
