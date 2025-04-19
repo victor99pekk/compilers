@@ -15,4 +15,20 @@ public class ProgramCFG {
         }
     }
 
+    public Set<CFG> applyMarkSweep(){
+        for (CFG cfg : this.cfgs){
+            MarkSweep markSweep = new MarkSweep();
+            markSweep.applyMarkSweep(cfg);
+        }
+        return this.cfgs;
+    }
+
+    public IRProgram convertToIRProgram(){
+
+        return null;
+    }
+
+    public ProgramCFG compileWithOptimization(IRProgram program){
+        return new ProgramCFG(program).applyMarkSweep().convertToIRProgram();
+    }
 }
