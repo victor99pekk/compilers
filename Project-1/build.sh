@@ -7,5 +7,5 @@
 # testing out the IRInterpreter. Create a 'bin' folder. Then run from materials/src:
 # javac -d bin $(find . -name "*.java")
 #
-# or run  
+# or run from workspace folder:
 # javac -d materials/src/bin $(find . -name "*.java")
