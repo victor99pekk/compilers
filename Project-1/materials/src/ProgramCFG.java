@@ -1,5 +1,3 @@
-import java.util.HashSet;
-import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +12,13 @@ public class ProgramCFG {
         this.cfgs = new ArrayList<CFG>();
         for (IRFunction function : program.functions){
             this.cfgs.add(CFG.mkCFG(function));
+        }
+    }
+
+    public void findReachingDefs() {
+        for (CFG cfg : this.cfgs) {
+            ReachingDefs rd = new ReachingDefs(cfg);
+            rd.findReachingDefs();
         }
     }
 

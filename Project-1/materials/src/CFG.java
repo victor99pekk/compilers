@@ -7,10 +7,6 @@ import java.util.Set;
 
 import ir.IRFunction;
 import ir.IRInstruction;
-import ir.IRProgram;
-import ir.datatype.IRType;
-import ir.operand.IROperand;
-import ir.operand.IRVariableOperand;
 
 public class CFG {
 

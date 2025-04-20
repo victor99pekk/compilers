@@ -4,7 +4,7 @@
  *     - output: class of sets GEN, KILL, PREV_IN, PREV_OUT, CURR_IN, CURR_OUT
  *         - PREV_ and CURR_ sets determine if algorithm has reached a fixed point
  * 
- * Step 2: for each basic block calculate it's GEN set and initialize PREV_OUT to GEN
+ * Step 2: for each basic block calculate it's GEN set and initialize CURR_OUT to GEN
  * 
  * Step 3: for each basic block, iterate through all other basic blocks and calculate its KILL set
  *     - should just be all definitions that 'redefine' definitions in GEN (?)
@@ -105,7 +105,7 @@ import ir.IRInstruction;
         return assign1.equals(assign2);
     }
 
-    // intialize PREV_OUT to GEN
+    // intialize CURR_OUT to GEN
     private void findGen() {
         Map<Integer, BasicBlock> basicBlocks = cfg.getBasicBlocks();
 
@@ -118,7 +118,7 @@ import ir.IRInstruction;
                     continue;
                 
                 dfs.GEN.add(instr);
-                dfs.PREV_OUT.add(instr);
+                dfs.CURR_OUT.add(instr);
             }
         }
     }
@@ -182,7 +182,7 @@ import ir.IRInstruction;
 
         Set<IRInstruction> newIn = new HashSet<IRInstruction>();
         for (BasicBlock pred_bb : predecessors) {
-            Set<IRInstruction> pred_prev_out = dfsMap.get(pred_bb).PREV_OUT;
+            Set<IRInstruction> pred_prev_out = dfsMap.get(pred_bb).CURR_OUT;
             newIn = setUnion(newIn, pred_prev_out);
         }
 
@@ -195,8 +195,11 @@ import ir.IRInstruction;
                 BasicBlock bb = bbSets.getKey();
                 DataFlowSets dfs = bbSets.getValue();
 
+                dfs.PREV_IN = dfs.CURR_IN;
+                dfs.PREV_OUT = dfs.CURR_OUT;
+
                 dfs.CURR_IN = unionPredecessorsOuts(bb);
-                dfs.CURR_OUT = setUnion(dfs.GEN, setDifference(dfs.PREV_IN, dfs.KILL));
+                dfs.CURR_OUT = setUnion(dfs.GEN, setDifference(dfs.CURR_IN, dfs.KILL));
             }
 
             boolean changed = false;

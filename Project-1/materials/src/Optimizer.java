@@ -10,6 +10,7 @@ public class Optimizer {
 
         // optimize program
         ProgramCFG pcfg = new ProgramCFG(program);
+        pcfg.findReachingDefs();
         // pcfg.applyMarkSweep();
         IRProgram optimizedProgram = pcfg.convertToIRProgram();
 
