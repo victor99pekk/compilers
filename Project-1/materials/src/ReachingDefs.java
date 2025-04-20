@@ -68,6 +68,7 @@ import ir.IRInstruction;
             case OR:
             case ARRAY_STORE:
             case ARRAY_LOAD:
+            case CALLR:
                 return true;
             default:
                 return false;

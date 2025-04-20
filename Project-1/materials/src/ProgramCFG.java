@@ -1,21 +1,23 @@
 import java.util.HashSet;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 import ir.IRFunction;
 import ir.IRProgram;
 
 public class ProgramCFG {
     
-    private Set<CFG> cfgs;
+    private List<CFG> cfgs;
 
     public ProgramCFG(IRProgram program){
-        this.cfgs = new HashSet<>();
+        this.cfgs = new ArrayList<CFG>();
         for (IRFunction function : program.functions){
             this.cfgs.add(CFG.mkCFG(function));
         }
     }
 
-    public Set<CFG> applyMarkSweep(){
+    public List<CFG> applyMarkSweep(){
         for (CFG cfg : this.cfgs){
             MarkSweep markSweep = new MarkSweep();
             markSweep.applyMarkSweep(cfg);

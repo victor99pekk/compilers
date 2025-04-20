@@ -61,7 +61,7 @@ public class CFG {
         // basically a copy of the pseudocode from lecture 2, page 21
 
         Builder cfgBuilder = new CFG.Builder();
-        Set<IRInstruction> headers = new HashSet<>();
+        List<IRInstruction> headers = new ArrayList<>();
         Map<Integer, BasicBlock> lineToBlock = new HashMap<>(); // irLineNumber to basic block
         Map<String, BasicBlock> labelToBlock = new HashMap<>();
 
@@ -112,11 +112,11 @@ public class CFG {
                     nextBb = lineToBlock.get(lstInstr.irLineNumber + 1);
                     cfgBuilder.addEdge(bb, nextBb);
                 }
-                String target = lstInstr.operands[1].toString();
+                String target = lstInstr.operands[0].toString();
                 nextBb = labelToBlock.get(target);
                 cfgBuilder.addEdge(bb, nextBb);
             } else if (isGoto(lstInstr)) {
-                String target = lstInstr.operands[1].toString();
+                String target = lstInstr.operands[0].toString();
                 nextBb = labelToBlock.get(target);
                 cfgBuilder.addEdge(bb, nextBb);
             } else if (instrno + 1 < numInstrs) {
