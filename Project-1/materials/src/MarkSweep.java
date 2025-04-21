@@ -13,21 +13,6 @@ public class MarkSweep {
     private Set<IRInstruction> marked;
     private Set<IRInstruction> worklist;
 
-    // represents the operands being read from in a critical operation
-    // OpCode enum exists because array_load instructions need to be handled specially
-    private static class CriticalOperands {
-        public enum OpCode {
-            ARRAY_LOAD,
-            NON_ARRAY_LOAD;
-        }
-        public OpCode opCode;
-        public List<IROperand> critOps;
-
-        public CriticalOperands() {
-            this.critOps = new ArrayList<IROperand>();
-        }
-    }
-
     public MarkSweep(){
         this.marked = new HashSet<>();
         this.worklist = new HashSet<>();
@@ -71,16 +56,15 @@ public class MarkSweep {
     }
 
     // for a instruction marked as critical, get it's (input) operands
-    private CriticalOperands criticalOperands(IRInstruction instr) {
-        CriticalOperands ops = new CriticalOperands();
+    private List<IROperand> criticalOperands(IRInstruction instr) {
+        List<IROperand> ops = new ArrayList<>();
         
         switch (instr.opCode) {
             case ASSIGN:
-                ops.opCode = CriticalOperands.OpCode.NON_ARRAY_LOAD;
                 if (instr.operands.length == 2) { // variable assign (Tiger IR page 3)
-                    ops.critOps.add(instr.operands[1]);
+                    ops.add(instr.operands[1]);
                 } else { // array assign (Tiger IR page 5)
-                    ops.critOps.add(instr.operands[2]);
+                    ops.add(instr.operands[2]);
                 }
                 break;
             case ADD:
@@ -95,37 +79,30 @@ public class MarkSweep {
             case BRGT:
             case BRLEQ:
             case BRGEQ:
-                ops.opCode = CriticalOperands.OpCode.NON_ARRAY_LOAD;
-                ops.critOps.add(instr.operands[1]);
-                ops.critOps.add(instr.operands[2]);
+                ops.add(instr.operands[1]);
+                ops.add(instr.operands[2]);
                 break;
             case RETURN:
-                ops.opCode = CriticalOperands.OpCode.NON_ARRAY_LOAD;
-                ops.critOps.add(instr.operands[0]);
+                ops.add(instr.operands[0]);
                 break;
             case CALL:
-                ops.opCode = CriticalOperands.OpCode.NON_ARRAY_LOAD;
                 for (int i = 1; i < instr.operands.length; i++) {
-                    ops.critOps.add(instr.operands[i]);
+                    ops.add(instr.operands[i]);
                 }
                 break;
             case CALLR:
-                ops.opCode = CriticalOperands.OpCode.NON_ARRAY_LOAD;
                 for (int i = 2; i < instr.operands.length; i++) {
                     IROperand temp = instr.operands[i];
-                    ops.critOps.add(temp);
+                    ops.add(temp);
                 }
                 break;
             case ARRAY_STORE:
-                ops.opCode = CriticalOperands.OpCode.NON_ARRAY_LOAD;
-                ops.critOps.add(instr.operands[0]);
-                ops.critOps.add(instr.operands[2]);
+                ops.add(instr.operands[0]);
+                ops.add(instr.operands[2]);
                 break;
             case ARRAY_LOAD:
-                // ops.opCode = CriticalOperands.OpCode.ARRAY_LOAD;
-                ops.opCode = CriticalOperands.OpCode.NON_ARRAY_LOAD;
-                ops.critOps.add(instr.operands[1]);
-                ops.critOps.add(instr.operands[2]);
+                ops.add(instr.operands[1]);
+                ops.add(instr.operands[2]);
                 break;
             case LABEL:
             case GOTO:
@@ -135,45 +112,10 @@ public class MarkSweep {
         return ops;
     }
 
-    // private Set<IRInstruction> markArrayLoad(CriticalOperands critOps, Set<IRInstruction> reachingDefs) {
-    //     Set<IRInstruction> worklistAdditions = new HashSet<>();
-
-    //     String arrayName = critOps.critOps.get(0).toString();
-    //     String index = critOps.critOps.get(1).toString();
-
-    //     for (IRInstruction rd : reachingDefs) {
-    //         if (this.marked.contains(rd)) {
-    //             continue;
-    //         }
-
-    //         // // we're only concerned with defs writing to index 'index' of array 'arrayName'
-    //         // if (rd.opCode != IRInstruction.OpCode.ARRAY_STORE) {
-    //         //     continue;
-    //         // }
-
-    //         String defOpString;
-    //         if (rd.opCode == IRInstruction.OpCode.ARRAY_STORE) { // get array being written to
-    //             defOpString = rd.operands[1].toString();
-    //         } else { // else get the (int or float) variable being written to
-    //             defOpString = rd.operands[0].toString();
-    //         }
-
-    //         // String defArrayName = rd.operands[1].toString();
-    //         // String defIndex = rd.operands[2].toString();
-
-    //         if ((arrayName.equals(defArrayName)) && (index.equals(defIndex))) {
-    //             this.marked.add(rd);
-    //             worklistAdditions.add(rd);
-    //         }
-    //     }
-
-    //     return worklistAdditions;
-    // }
-
-    private Set<IRInstruction> markNonArrayLoad(CriticalOperands critOps, Set<IRInstruction> reachingDefs) {
+    private Set<IRInstruction> markReachingDefs(List<IROperand> critOps, Set<IRInstruction> reachingDefs) {
         Set<IRInstruction> worklistAdditions = new HashSet<>();
         
-        for (IROperand op : critOps.critOps) {
+        for (IROperand op : critOps) {
             String opString = op.toString();
             for (IRInstruction rd : reachingDefs) {
                 if (this.marked.contains(rd)) {
@@ -193,19 +135,6 @@ public class MarkSweep {
                 }
             }
         }
-
-        return worklistAdditions;
-    }
-
-    private Set<IRInstruction> markReachingDefs(CriticalOperands critOps, Set<IRInstruction> reachingDefs) {
-        Set<IRInstruction> worklistAdditions = new HashSet<>();
-        
-        // if (critOps.opCode == CriticalOperands.OpCode.ARRAY_LOAD) {
-        //     worklistAdditions = markArrayLoad(critOps, reachingDefs);
-        // } else {
-        //     worklistAdditions = markNonArrayLoad(critOps, reachingDefs);
-        // }
-        worklistAdditions = markNonArrayLoad(critOps, reachingDefs);
 
         return worklistAdditions;
     }
@@ -236,7 +165,7 @@ public class MarkSweep {
                 it.remove();
 
                 // the operands being read from in a critical operation
-                CriticalOperands critOps = criticalOperands(critInstr);
+                List<IROperand> critOps = criticalOperands(critInstr);
 
                 BasicBlock bb = cfg.getBasicBlock(critInstr);
 
