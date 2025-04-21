@@ -94,9 +94,9 @@ import ir.IRInstruction;
             // verify that operand 1 is the array name and operand 2 is the index
             String array_name_1 = def1.operands[1].toString();
             String array_name_2 = def2.operands[1].toString();
-            String array_idx_1 = def1.operands[2].toString();
-            String array_idx_2 = def2.operands[2].toString();
-            return (array_name_1.equals(array_name_2) && array_idx_1.equals(array_idx_2));
+            // String array_idx_1 = def1.operands[2].toString();
+            // String array_idx_2 = def2.operands[2].toString();
+            return array_name_1.equals(array_name_2); // && array_idx_1.equals(array_idx_2));
         }
 
         // otherwise, assume that operand 0 is the variable being assigned to

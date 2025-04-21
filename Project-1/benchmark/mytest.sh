@@ -9,8 +9,8 @@ test_dir="sqrt/"
 test="sqrt.ir"
 
 # choose whether to run default ir or (our) optimized ir
-test_file="$test_prefix$test_dir$test"
-# test_file="../out.ir"
+# test_file="$test_prefix$test_dir$test"
+test_file="../out.ir"
 
 for i in {0..9}; do 
     test_case="$test_prefix$test_dir${i}.in"
