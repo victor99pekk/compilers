@@ -22,6 +22,10 @@ public class MarkSweep {
         }
         public OpCode opCode;
         public List<IROperand> critOps;
+
+        public CriticalOperands() {
+            this.critOps = new ArrayList<IROperand>();
+        }
     }
 
     public MarkSweep(){
@@ -108,7 +112,8 @@ public class MarkSweep {
             case CALLR:
                 ops.opCode = CriticalOperands.OpCode.NON_ARRAY_LOAD;
                 for (int i = 2; i < instr.operands.length; i++) {
-                    ops.critOps.add(instr.operands[i]);
+                    IROperand temp = instr.operands[i];
+                    ops.critOps.add(temp);
                 }
                 break;
             case ARRAY_STORE:
@@ -135,6 +140,10 @@ public class MarkSweep {
         String index = critOps.critOps.get(1).toString();
 
         for (IRInstruction rd : reachingDefs) {
+            if (this.marked.contains(rd)) {
+                continue;
+            }
+
             // we're only concerned with defs writing to index 'index' of array 'arrayName'
             if (rd.opCode != IRInstruction.OpCode.ARRAY_STORE) {
                 continue;
@@ -158,6 +167,9 @@ public class MarkSweep {
         for (IROperand op : critOps.critOps) {
             String opString = op.toString();
             for (IRInstruction rd : reachingDefs) {
+                if (this.marked.contains(rd)) {
+                    continue;
+                }
                 if (rd.opCode == IRInstruction.OpCode.ARRAY_STORE) { // should be handled in markArrayLoad
                     continue;
                 }
@@ -175,7 +187,7 @@ public class MarkSweep {
     private Set<IRInstruction> markReachingDefs(CriticalOperands critOps, Set<IRInstruction> reachingDefs) {
         Set<IRInstruction> worklistAdditions = new HashSet<>();
         
-        if (critOps.opCode.equals(CriticalOperands.OpCode.ARRAY_LOAD)) {
+        if (critOps.opCode == CriticalOperands.OpCode.ARRAY_LOAD) {
             worklistAdditions = markArrayLoad(critOps, reachingDefs);
         } else {
             worklistAdditions = markNonArrayLoad(critOps, reachingDefs);
@@ -236,6 +248,7 @@ public class MarkSweep {
         for (Map.Entry<Integer, BasicBlock> bbMap : basicBlocks.entrySet()) {
             BasicBlock bb = bbMap.getValue();
 
+            List<IRInstruction> instrsToRemove = new ArrayList<>();
             for (IRInstruction instr : bb.getInstructions()) {
                 if (!isDefinition(instr)) {  // for now, only worry about removing unnecessary definitions
                     continue;
@@ -245,6 +258,10 @@ public class MarkSweep {
                     continue;
                 }
 
+                instrsToRemove.add(instr);
+            }
+
+            for (IRInstruction instr : instrsToRemove) {
                 bb.removeInstruction(instr);
             }
         }
