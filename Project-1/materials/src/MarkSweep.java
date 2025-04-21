@@ -184,6 +184,10 @@ public class MarkSweep {
         return worklistAdditions;
     }
 
+    private Set<IRInstruction> markInternalReachingDefs(CriticalOperands critOps, List<IRInstruction> instrs) {
+        // TODO
+    }
+
     private void mark(CFG cfg) {
         Map<Integer, BasicBlock> basicBlocks = cfg.getBasicBlocks();
 
@@ -213,9 +217,13 @@ public class MarkSweep {
                 CriticalOperands critOps = criticalOperands(critInstr);
 
                 BasicBlock bb = cfg.getBasicBlock(critInstr);
-                Set<IRInstruction> reachingDefs = bb.getReachingDefinitions();
 
-                worklistAdditions = markReachingDefs(critOps, reachingDefs);
+                // find definitions from other basic blocks that reach critInstr
+                Set<IRInstruction> reachingDefs = bb.getReachingDefinitions();
+                worklistAdditions.addAll(markReachingDefs(critOps, reachingDefs));
+
+                // find definitions within current block that reach critInstr
+
             }
             this.worklist.addAll(worklistAdditions);
         }
