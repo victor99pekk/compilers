@@ -17,6 +17,7 @@ public class CFG {
     private Map<BasicBlock, Set<BasicBlock>> outgoingEdges;
     private Map<BasicBlock, Set<BasicBlock>> incomingEdges;
     private IRFunction function; // the function from which the CFG is created
+    private Map<IRInstruction, BasicBlock> instrToBlock;
 
     // Private constructor to enforce the use of the Builder
     private CFG() {
@@ -25,6 +26,7 @@ public class CFG {
         this.blockCounter = 0;
         this.outgoingEdges = new HashMap<>();
         this.incomingEdges = new HashMap<>();
+        this.instrToBlock = new HashMap<>();
     }
 
     private static boolean isBranch(IRInstruction instr) {
@@ -100,6 +102,11 @@ public class CFG {
             }
             instrno--;
 
+            // map instructions to basic block
+            for (IRInstruction i : bb.getInstructions()) {
+                cfgBuilder.mapInstrToBlock(i, bb);
+            }
+
             // connect bb to other blocks
             IRInstruction lstInstr = instrs.get(instrno);
             BasicBlock nextBb;
@@ -139,6 +146,10 @@ public class CFG {
         return function;
     }
 
+    public void mapInstrToBlock(IRInstruction instr, BasicBlock bb) {
+        this.instrToBlock.put(instr, bb);
+    }
+
     public void addFunction(IRFunction function) {
         this.function = function;
     }
@@ -163,6 +174,10 @@ public class CFG {
 
     public void addLeafBlock(BasicBlock block) {
         leafBlocks.add(block);
+    }
+
+    public BasicBlock getBasicBlock(IRInstruction instr) {
+        return instrToBlock.get(instr);
     }
 
     public Map<Integer, BasicBlock> getBasicBlocks() {
@@ -191,6 +206,11 @@ public class CFG {
 
         public Builder() {
             this.cfg = new CFG();
+        }
+
+        public Builder mapInstrToBlock(IRInstruction instr, BasicBlock bb) {
+            this.cfg.mapInstrToBlock(instr, bb);
+            return this;
         }
 
         public Builder setStartBlock(BasicBlock startBlock) {

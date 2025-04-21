@@ -1,7 +1,9 @@
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.Iterator;
 
 import ir.IRInstruction;
 import ir.operand.IROperand;
@@ -11,7 +13,8 @@ public class MarkSweep {
     private Set<IRInstruction> marked;
     private Set<IRInstruction> worklist;
 
-    // array_load instructions need to be handled specially
+    // represents the operands being read from in a critical operation
+    // OpCode enum exists because array_load instructions need to be handled specially
     private static class CriticalOperands {
         public enum OpCode {
             ARRAY_LOAD,
@@ -24,6 +27,24 @@ public class MarkSweep {
     public MarkSweep(){
         this.marked = new HashSet<>();
         this.worklist = new HashSet<>();
+    }
+
+    private boolean isDefinition(IRInstruction instr) {
+        switch (instr.opCode) {
+            case ASSIGN:
+            case ADD:
+            case SUB:
+            case MULT:
+            case DIV:
+            case AND:
+            case OR:
+            case ARRAY_STORE:
+            case ARRAY_LOAD:
+            case CALLR:
+                return true;
+            default:
+                return false;
+        }
     }
 
     private boolean isCritical(IRInstruction instr) {
@@ -107,11 +128,121 @@ public class MarkSweep {
         return ops;
     }
 
-    private void mark(){}
-    private void sweep(){}
+    private Set<IRInstruction> markArrayLoad(CriticalOperands critOps, Set<IRInstruction> reachingDefs) {
+        Set<IRInstruction> worklistAdditions = new HashSet<>();
+
+        String arrayName = critOps.critOps.get(0).toString();
+        String index = critOps.critOps.get(1).toString();
+
+        for (IRInstruction rd : reachingDefs) {
+            // we're only concerned with defs writing to index 'index' of array 'arrayName'
+            if (rd.opCode != IRInstruction.OpCode.ARRAY_STORE) {
+                continue;
+            }
+
+            String defArrayName = rd.operands[1].toString();
+            String defIndex = rd.operands[2].toString();
+
+            if ((arrayName.equals(defArrayName)) && (index.equals(defIndex))) {
+                this.marked.add(rd);
+                worklistAdditions.add(rd);
+            }
+        }
+
+        return worklistAdditions;
+    }
+
+    private Set<IRInstruction> markNonArrayLoad(CriticalOperands critOps, Set<IRInstruction> reachingDefs) {
+        Set<IRInstruction> worklistAdditions = new HashSet<>();
+        
+        for (IROperand op : critOps.critOps) {
+            String opString = op.toString();
+            for (IRInstruction rd : reachingDefs) {
+                if (rd.opCode == IRInstruction.OpCode.ARRAY_STORE) { // should be handled in markArrayLoad
+                    continue;
+                }
+                String defOpString = rd.operands[0].toString();
+                if (opString.equals(defOpString)) {
+                    this.marked.add(rd);
+                    worklistAdditions.add(rd);
+                }
+            }
+        }
+
+        return worklistAdditions;
+    }
+
+    private Set<IRInstruction> markReachingDefs(CriticalOperands critOps, Set<IRInstruction> reachingDefs) {
+        Set<IRInstruction> worklistAdditions = new HashSet<>();
+        
+        if (critOps.opCode.equals(CriticalOperands.OpCode.ARRAY_LOAD)) {
+            worklistAdditions = markArrayLoad(critOps, reachingDefs);
+        } else {
+            worklistAdditions = markNonArrayLoad(critOps, reachingDefs);
+        }
+
+        return worklistAdditions;
+    }
+
+    private void mark(CFG cfg) {
+        Map<Integer, BasicBlock> basicBlocks = cfg.getBasicBlocks();
+
+        for (Map.Entry<Integer, BasicBlock> bbMap : basicBlocks.entrySet()) {
+            BasicBlock bb = bbMap.getValue();
+
+            for (IRInstruction instr : bb.getInstructions()) {
+                if (isCritical(instr)) {
+                    assert !this.marked.contains(instr);
+
+                    this.marked.add(instr);
+                    this.worklist.add(instr);
+                }
+            }
+        }
+
+        while (!worklist.isEmpty()) {
+            Set<IRInstruction> worklistAdditions = new HashSet<>();
+
+            // avoid adding to set while iterating over it (illegal)
+            Iterator<IRInstruction> it = this.worklist.iterator();
+            while (it.hasNext()) {
+                IRInstruction critInstr = it.next();
+                it.remove();
+
+                // the operands being read from in a critical operation
+                CriticalOperands critOps = criticalOperands(critInstr);
+
+                BasicBlock bb = cfg.getBasicBlock(critInstr);
+                Set<IRInstruction> reachingDefs = bb.getReachingDefinitions();
+
+                worklistAdditions = markReachingDefs(critOps, reachingDefs);
+            }
+            this.worklist.addAll(worklistAdditions);
+        }
+    }
+
+    private void sweep(CFG cfg) {
+        Map<Integer, BasicBlock> basicBlocks = cfg.getBasicBlocks();
+
+        for (Map.Entry<Integer, BasicBlock> bbMap : basicBlocks.entrySet()) {
+            BasicBlock bb = bbMap.getValue();
+
+            for (IRInstruction instr : bb.getInstructions()) {
+                if (!isDefinition(instr)) {  // for now, only worry about removing unnecessary definitions
+                    continue;
+                }
+
+                if (this.marked.contains(instr)) {
+                    continue;
+                }
+
+                bb.removeInstruction(instr);
+            }
+        }
+    }
 
     public void applyMarkSweep(CFG cfg){
-        ///.... todo ....
-        
+        mark(cfg);
+        sweep(cfg);
     }
 }
