@@ -84,13 +84,13 @@ import ir.IRInstruction;
             return false;
         }
         
-        if ((def1.opCode == IRInstruction.OpCode.ARRAY_STORE) && (def1.opCode != IRInstruction.OpCode.ARRAY_STORE)
-            || (def1.opCode != IRInstruction.OpCode.ARRAY_STORE) && (def1.opCode == IRInstruction.OpCode.ARRAY_STORE))
+        if ((def1.opCode == IRInstruction.OpCode.ARRAY_STORE) && (def2.opCode != IRInstruction.OpCode.ARRAY_STORE)
+            || (def1.opCode != IRInstruction.OpCode.ARRAY_STORE) && (def2.opCode == IRInstruction.OpCode.ARRAY_STORE))
         {
             return false;
         }
 
-        if ((def1.opCode == IRInstruction.OpCode.ARRAY_STORE) && (def1.opCode == IRInstruction.OpCode.ARRAY_STORE)) {
+        if ((def1.opCode == IRInstruction.OpCode.ARRAY_STORE) && (def2.opCode == IRInstruction.OpCode.ARRAY_STORE)) {
             // verify that operand 1 is the array name and operand 2 is the index
             String array_name_1 = def1.operands[1].toString();
             String array_name_2 = def2.operands[1].toString();

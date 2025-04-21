@@ -9,3 +9,4 @@
 # run from workspace folder:
 # java -cp materials/src/bin/ Optimizer <input program path> <output program path>
 
+java -cp materials/src/bin/ Optimizer $1

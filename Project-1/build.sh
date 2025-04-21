@@ -8,4 +8,5 @@
 # javac -d bin $(find . -name "*.java")
 #
 # or run from workspace folder:
-# javac -d materials/src/bin $(find . -name "*.java")
+mkdir -p materials/src/bin
+javac -d materials/src/bin $(find . -name "*.java")
