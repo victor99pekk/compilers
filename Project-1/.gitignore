@@ -7,3 +7,6 @@ materials/src/bin/
 
 # outputted ir file
 out.ir
+
+# graphs
+*.png
