@@ -105,6 +105,20 @@ import ir.IRInstruction;
         return assign1.equals(assign2);
     }
 
+    private boolean instrsEqual(IRInstruction inst1, IRInstruction inst2) {
+        if (inst1.opCode != inst2.opCode) {
+            return false;
+        }
+
+        for (int i = 0; i < inst1.operands.length; i++) {
+            if (inst1.operands[i] != inst2.operands[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     // intialize CURR_OUT to GEN
     private void findGen() {
         Map<Integer, BasicBlock> basicBlocks = cfg.getBasicBlocks();
@@ -157,7 +171,7 @@ import ir.IRInstruction;
             boolean contains = false;
 
             for (IRInstruction instr2 : set2) {
-                if (defsEqual(instr1, instr2)) {
+                if (instrsEqual(instr1, instr2)) {
                     contains = true;
                     break;
                 }

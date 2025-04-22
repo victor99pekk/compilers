@@ -49,6 +49,7 @@ public class MarkSweep {
             case CALL:
             case CALLR:
             case LABEL:
+            case ARRAY_STORE:
                 return true;
             default:
                 return false;
