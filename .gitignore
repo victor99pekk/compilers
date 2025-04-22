@@ -1,12 +1,12 @@
 # vscode
-.vscode/
+*/.vscode/
 
 # .class files
 *.class
-materials/src/bin/
+*/materials/src/bin/
 
 # outputted ir file
-out.ir
+*/out.ir
 
 # graphs
 *.png

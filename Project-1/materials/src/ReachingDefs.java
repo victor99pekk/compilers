@@ -17,8 +17,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.List;
 
 import ir.IRInstruction;
+import ir.operand.IROperand;
 
  public class ReachingDefs {
 
@@ -127,9 +129,32 @@ import ir.IRInstruction;
             BasicBlock bb = entry.getValue();
             DataFlowSets dfs = dfsMap.get(bb);
 
-            for (IRInstruction instr : bb.getInstructions()) {
+            Set<IROperand> outOps = new HashSet<>();
+            List<IRInstruction> instructions = bb.getInstructions();
+            for (int i = instructions.size() - 1; i >= 0; i--) {
+                IRInstruction instr = instructions.get(i);
+
                 if (!isDefinition(instr))
                     continue;
+                
+                // make sure definition isn't written over within the same block
+                IROperand o;
+                if (instr.opCode == IRInstruction.OpCode.ARRAY_STORE) {
+                    o = instr.operands[1];
+                } else {
+                    o = instr.operands[0];
+                }
+                boolean contains = false;
+                for (IROperand out : outOps) {
+                    if (o.toString().equals(out.toString())) {
+                        contains = true;
+                    }
+                }
+                if (contains) {
+                    continue;
+                }
+
+                outOps.add(o);
                 
                 dfs.GEN.add(instr);
                 dfs.CURR_OUT.add(instr);
