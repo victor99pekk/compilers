@@ -2,11 +2,11 @@
 
 test_prefix="../materials/public_test_cases/"
 
-# test_dir="quicksort/"
-test_dir="sqrt/"
+test_dir="quicksort/"
+# test_dir="sqrt/"
 
-# test="quicksort.ir"
-test="sqrt.ir"
+test="quicksort.ir"
+# test="sqrt.ir"
 
 # choose whether to run default ir or (our) optimized ir
 # test_file="$test_prefix$test_dir$test"

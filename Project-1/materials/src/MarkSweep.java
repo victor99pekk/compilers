@@ -139,6 +139,44 @@ public class MarkSweep {
         return worklistAdditions;
     }
 
+    private Set<IRInstruction> markInternalReachingDefs(List<IROperand> critOps, List<IRInstruction> reachingDefs) {
+        Set<IRInstruction> worklistAdditions = new HashSet<>();
+        Set<IROperand> opsToRemove = new HashSet<>();
+
+        for (IROperand op : critOps) {
+            String opString = op.toString();
+            for (int i = reachingDefs.size() - 1; i >= 0; i--) {
+                IRInstruction rd = reachingDefs.get(i);
+
+                if (this.marked.contains(rd)) {
+                    continue;
+                }
+                
+                String defOpString;
+                if (rd.opCode == IRInstruction.OpCode.ARRAY_STORE) { // get array being written to
+                    defOpString = rd.operands[1].toString();
+                } else { // else get the (int or float) variable being written to
+                    defOpString = rd.operands[0].toString();
+                }
+
+                if (opString.equals(defOpString)) {
+                    this.marked.add(rd);
+                    worklistAdditions.add(rd);
+                    opsToRemove.add(op);
+                    break;
+                }
+            }
+        }
+
+        for (IROperand op : opsToRemove) {
+            int idx = critOps.indexOf(op);
+            assert idx >= 0;
+            critOps.remove(idx);
+        }
+
+        return worklistAdditions;
+    }
+
     private void mark(CFG cfg) {
         Map<Integer, BasicBlock> basicBlocks = cfg.getBasicBlocks();
 
@@ -169,17 +207,16 @@ public class MarkSweep {
 
                 BasicBlock bb = cfg.getBasicBlock(critInstr);
 
-                // find definitions from other basic blocks that reach critInstr
-                Set<IRInstruction> reachingDefs = bb.getReachingDefinitions();
-                worklistAdditions.addAll(markReachingDefs(critOps, reachingDefs));
-
                 // find definitions within current block that reach critInstr
                 List<IRInstruction> instrs = bb.getInstructions();
                 int instrIndex = instrs.indexOf(critInstr);
                 assert instrIndex >= 0;
                 List<IRInstruction> preceedingInstrsList = instrs.subList(0, instrIndex + 1);
-                Set<IRInstruction> preceedingInstrsSet = new HashSet<>(preceedingInstrsList);
-                worklistAdditions.addAll(markReachingDefs(critOps, preceedingInstrsSet));
+                worklistAdditions.addAll(markInternalReachingDefs(critOps, preceedingInstrsList));
+
+                // find definitions from other basic blocks that reach critInstr
+                Set<IRInstruction> reachingDefs = bb.getReachingDefinitions();
+                worklistAdditions.addAll(markReachingDefs(critOps, reachingDefs));
             }
             this.worklist.addAll(worklistAdditions);
         }

@@ -10,3 +10,12 @@ out.ir
 
 # graphs
 *.png
+
+# report
+*.pdf
+
+# zip
+*.zip
+
+# Matthew
+/Project-1_turnin/
