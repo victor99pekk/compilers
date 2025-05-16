@@ -3,79 +3,125 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 
+import ir.IRException;
+import ir.IRFunction;
+import ir.IRInstruction;
+import ir.IRProgram;
+import ir.IRReader;
+
 public class InstructionSelector {
-    private static final Map<String,String> TEMPLATES = new HashMap<>();
+    private static final Map<String, String> TEMPLATES = new HashMap<>();
     static {
-        TEMPLATES.put("ADD",   "ADD {dst}, {lhs}, {rhs}");
-        TEMPLATES.put("SUB",   "SUB {dst}, {lhs}, {rhs}");
-        TEMPLATES.put("MUL",   "MUL {dst}, {lhs}, {rhs}");
-        TEMPLATES.put("DIV",   "DIV {lhs}, {rhs}\\nMFLO {dst}");  // DIV -> LO
-        TEMPLATES.put("LOAD",  "LW  {dst}, {offset}({base})");
-        TEMPLATES.put("STORE", "SW  {src}, {offset}({base})");
-        TEMPLATES.put("CALL",  "JAL {funcLabel}");
-        TEMPLATES.put("RET",   "JR  $ra");
+        TEMPLATES.put("ADD",       "ADD {dst}, {lhs}, {rhs}");
+        TEMPLATES.put("SUB",       "SUB {dst}, {lhs}, {rhs}");
+        TEMPLATES.put("MULT",      "MULT {lhs}, {rhs}\nMFLO {dst}");
+        TEMPLATES.put("DIV",       "DIV {lhs}, {rhs}\nMFLO {dst}");
+        TEMPLATES.put("AND",       "AND {dst}, {lhs}, {rhs}");
+        TEMPLATES.put("OR",        "OR  {dst}, {lhs}, {rhs}");
+        TEMPLATES.put("GOTO",      "J    {label}");
+        TEMPLATES.put("BREQ",      "BEQ  {lhs}, {rhs}, {label}");
+        TEMPLATES.put("BRNEQ",     "BNE  {lhs}, {rhs}, {label}");
+        TEMPLATES.put("BRLT",      "BLT  {lhs}, {rhs}, {label}");
+        TEMPLATES.put("BRGT",      "BGT  {lhs}, {rhs}, {label}");
+        TEMPLATES.put("BRLEQ",     "BLE  {lhs}, {rhs}, {label}");
+        TEMPLATES.put("BRGEQ",     "BGE  {lhs}, {rhs}, {label}");
+        TEMPLATES.put("ARRAY_LOAD","LW   {dst}, {offset}({base})");
+        TEMPLATES.put("ARRAY_STORE","SW  {src}, {offset}({base})");
+        TEMPLATES.put("CALL",      "JAL  {func}");
+        TEMPLATES.put("CALLR",     "JAL  {func}\nMOV  {dst}, ");
+        TEMPLATES.put("RETURN",    "JR   ");
+        TEMPLATES.put("LABEL",     "{label}:");
     }
 
-    public static class IRInstr {
-        public String opcode;
-        public String dst, lhs, rhs;
-        public String base, funcLabel;
-        public int    offset;
-        public String src;
-        public IRInstr(String op, String d, String l, String r) {
-            opcode = op; dst = d; lhs = l; rhs = r;
-        }
-        public IRInstr(String op, String d, String b, int off, boolean isLoad) {
-            opcode = op; dst = isLoad ? d : null;
-            src    = isLoad ? null : d;
-            base   = b; offset = off;
-        }
-        public IRInstr(String op, String f) {
-            opcode = op; funcLabel = f;
-        }
-    }
+    private static List<String> selectInstruction(IRInstruction instr) {
+        String op = instr.opCode.name();
+        String tpl = TEMPLATES.get(op);
+        if (tpl == null) throw new IllegalArgumentException("Unmapped opcode: " + op);
 
-    private static List<String> selectInstruction(IRInstr instr) {
-        String tpl = TEMPLATES.get(instr.opcode);
-        if (tpl == null) {
-            throw new IllegalArgumentException("No template for " + instr.opcode);
+        // Prepare placeholder values
+        String dst   = "";
+        String lhs   = "";
+        String rhs   = "";
+        String label = "";
+        String func  = "";
+        String base  = "";
+        String src   = "";
+        String offset= "";
+
+        switch (instr.opCode) {
+            case ADD: case SUB: case MULT: case DIV:
+            case AND: case OR:
+                dst = instr.operands[0].toString();
+                lhs = instr.operands[1].toString();
+                rhs = instr.operands[2].toString();
+                break;
+            case GOTO:
+                label = instr.operands[0].toString();
+                break;
+            case BREQ: case BRNEQ: case BRLT: case BRGT: case BRLEQ: case BRGEQ:
+                lhs   = instr.operands[1].toString();
+                rhs   = instr.operands[2].toString();
+                label = instr.operands[0].toString();
+                break;
+            case ARRAY_LOAD:
+                dst    = instr.operands[0].toString();
+                base   = instr.operands[1].toString();
+                offset = instr.operands[2].toString();
+                break;
+            case ARRAY_STORE:
+                src    = instr.operands[0].toString();
+                base   = instr.operands[1].toString();
+                offset = instr.operands[2].toString();
+                break;
+            case CALL:
+                func = instr.operands[0].toString();
+                break;
+            case CALLR:
+                func = instr.operands[1].toString();
+                dst  = instr.operands[0].toString();
+                break;
+            case RETURN:
+                break;
+            case LABEL:
+                label = instr.operands[0].toString();
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported opcode: " + op);
         }
+
         String filled = tpl
-            .replace("{dst}",       instr.dst     != null ? instr.dst       : "")
-            .replace("{lhs}",       instr.lhs     != null ? instr.lhs       : "")
-            .replace("{rhs}",       instr.rhs     != null ? instr.rhs       : "")
-            .replace("{base}",      instr.base    != null ? instr.base      : "")
-            .replace("{funcLabel}", instr.funcLabel != null ? instr.funcLabel : "")
-            .replace("{offset}",    Integer.toString(instr.offset))
-            .replace("{src}",       instr.src     != null ? instr.src       : "");
-        return Arrays.asList(filled.split("\\\\n"));
+            .replace("{dst}", dst)
+            .replace("{lhs}", lhs)
+            .replace("{rhs}", rhs)
+            .replace("{label}", label)
+            .replace("{func}", func)
+            .replace("{base}", base)
+            .replace("{src}", src)
+            .replace("{offset}", offset);
+
+        return Arrays.asList(filled.split("\n"));
     }
 
-    public static List<String> instructionSelection(List<IRInstr> irProgram) {
+    public static List<String> instructionSelection(IRProgram program) {
         List<String> mips = new ArrayList<>();
-        for (IRInstr instr : irProgram) {
-            mips.addAll(selectInstruction(instr));
+        for (IRFunction fn : program.functions) {
+            mips.add(fn.name + ":");
+            for (IRInstruction instr : fn.instructions) {
+                mips.addAll(selectInstruction(instr));
+            }
+            mips.add("");
         }
         return mips;
     }
 
-    public static void writeMipsToFile(List<String> mipsLines, String path) throws IOException {
-        Files.write(Paths.get(path), mipsLines);
+    public static void writeMipsToFile(List<String> lines, String path) throws IOException {
+        Files.write(Paths.get(path), lines);
     }
 
-    // public static void main(String[] args) throws IOException {
-    //     // Suppose you already have parsed IR:
-    //     List<IRInstr> ir = List.of(
-    //         new IRInstr("ADD", "v1", "v2", "v3"),
-    //         new IRInstr("LOAD", "v4", "v5", 8, true),
-    //         new IRInstr("CALL", "myFunction"),
-    //         new IRInstr("RET",  "")
-    //     );
-
-    //     List<String> mips = instructionSelection(ir);
-    //     writeMipsToFile(mips, "out.s");
-
-    //     System.out.println("Generated MIPS:");
-    //     mips.forEach(System.out::println);
-    // }
+    public static void main(String[] args) throws IOException, IRException {
+        IRProgram prog = new IRReader().parseIRFile(args[0]);
+        List<String> mips = instructionSelection(prog);
+        writeMipsToFile(mips, "out.s");
+        System.out.println("Generated " + mips.size() + " MIPS lines to out.s");
+    }
 }
