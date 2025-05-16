@@ -70,7 +70,7 @@ public class InstructionSelector {
     }
 
     private static void storeNumeric(List<List<String>>list, String dst, String src){
-        String tpl = TEMPLATES.get("ASSIGN");
+        String tpl = "addi ${dst}, $0, ${src}";
         String lhs   = "";
         String rhs   = "";
         String label = "";
@@ -109,7 +109,20 @@ public class InstructionSelector {
         String offset= "";
 
         switch (instr.opCode) {
-            case ADD: case MULT: case DIV:
+            case MULT:
+                lhs   = instr.operands[1].toString();
+                rhs   = instr.operands[2].toString();
+                label = instr.operands[0].toString();
+                if (isNumeric(lhs)){
+                    storeNumeric(list, "reg1", lhs);
+                    lhs = "reg1";
+                }
+                if (isNumeric(rhs)){
+                    storeNumeric(list, "reg2", lhs);
+                    rhs = "reg2";
+                }
+                break;
+            case ADD: case DIV:
             case AND: case OR:
                 dst = instr.operands[0].toString();
                 lhs = instr.operands[1].toString();
@@ -135,13 +148,8 @@ public class InstructionSelector {
             case GOTO:
                 label = instr.operands[0].toString();
                 break;
-            case BREQ:
-                lhs   = instr.operands[1].toString();
-                rhs   = instr.operands[2].toString();
-                label = instr.operands[0].toString();
 
-                break;
-            case BRNEQ: case BRLT: case BRGT: case BRLEQ: case BRGEQ:
+            case BRNEQ: case BRLT: case BRGT: case BRLEQ: case BRGEQ: case BREQ:
                 lhs   = instr.operands[1].toString();
                 rhs   = instr.operands[2].toString();
                 label = instr.operands[0].toString();
@@ -158,6 +166,10 @@ public class InstructionSelector {
                 dst    = instr.operands[0].toString();
                 base   = instr.operands[1].toString();
                 offset = instr.operands[2].toString();
+                storeNumeric(list, "arr", base);
+                storeNumeric(list, "offset", offset);
+                // sll   $t2, $t1, 2   # $t2 = $t1 << 2
+                createLines(list, "la $rt, {base}", dst, lhs, rhs, label, func, base, src, offset);
                 break;
             case ARRAY_STORE:
                 src    = instr.operands[0].toString();
@@ -197,7 +209,42 @@ public class InstructionSelector {
         return list;
     }
 
-    /* Return instructions that load arguments into virtual registers (on the stack) */
+    private static void createLines(List<List<String>>list, String tpl, String dst, String lhs, String rhs, String label, 
+                                    String func, String base, String src, String offset){
+        List<String> lines = new ArrayList<>();
+        for (String line : tpl.split("\\n")) {
+            String filled = line
+                .replace("${dst}",   formatReg(dst))
+                .replace("${lhs}",   formatReg(lhs))
+                .replace("${rhs}",   formatReg(rhs))
+                .replace("${label}", label)
+                .replace("${func}",  func)
+                .replace("${base}",  formatReg(base))
+                .replace("${src}",   formatReg(src))
+                .replace("${offset}", offset);
+            lines.add("  " + filled);
+        }
+        list.add(lines);
+    }
+
+    private static void createLines(List<List<String>>list, String tpl, String dst, String lhs, String rhs, String label, 
+                                    String func, String base, String src, String offset){
+        List<String> lines = new ArrayList<>();
+        for (String line : tpl.split("\\n")) {
+            String filled = line
+                .replace("${dst}",   formatReg(dst))
+                .replace("${lhs}",   formatReg(lhs))
+                .replace("${rhs}",   formatReg(rhs))
+                .replace("${label}", label)
+                .replace("${func}",  func)
+                .replace("${base}",  formatReg(base))
+                .replace("${src}",   formatReg(src))
+                .replace("${offset}", offset);
+            lines.add("  " + filled);
+        }
+        list.add(lines);
+    }
+
     private static List<String> loadArguments(IRFunction func, Map<String, Integer> vRegToOffset) {
         List<IRVariableOperand> params = func.parameters;
 
