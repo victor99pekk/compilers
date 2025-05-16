@@ -1,10 +1,11 @@
 quicksort:
+ move $fp, $sp
+ addi $sp, $sp, -856
 MOVE $i, 0
 MOVE $j, 0
 BGE  $lo, $hi, end
 ADD $mid, $lo, $hi
-DIV $mid, 2
-MFLO $mid
+DIV  $mid $mid, 2
 LW   $pivot, mid($A)
 SUB $i, $lo, 1
 ADD $j, $hi, 1
@@ -31,6 +32,8 @@ JAL  quicksort
 end:
 
 main:
+ move $fp, $sp
+ addi $sp, $sp, -424
 MOVE $t, 0
 JAL  geti
 MOVE $n, $v0
