@@ -17,6 +17,19 @@ import main.java.mips.MIPSInstruction;
 public class InstructionSelector {
     private int pc = 1000;
     private int fp = 1000;
+
+    /* 'temp' virtual registers for storing immediates
+     *     Example 1:
+     *     Tiger IR branch instructions allow immediates in conditionals (bgt x 2 label)
+     *     MIPS branch instructions only take two registers (bgt x y label)
+     *     => need to store immediate in a register
+     * 
+     *     Example 2:
+     *     May need to load/store a memory address from/to index into an array
+     *     Can use two register to calculate the address to read/write from/to
+     */
+    private static String _tempVirt0 = "temp0";
+    private static String _tempVirt1 = "temp1";
     private static final Map<String, String> TEMPLATES = new HashMap<>();
     static {
         TEMPLATES.put("ADD",        "add ${dst}, ${lhs}, ${rhs}");
@@ -185,23 +198,34 @@ public class InstructionSelector {
         if (name.startsWith("$")) return name;
         return "$" + name;
     }
-
-    Map<String, Integer> virtualRegisterToOffset(IRFunction func) {
+    
+    /* Returns map from "virtual register" name to offset (below) the frame pointer
+     *     "Virtual registers" refer to memory locations on the current function's stack frame
+    */
+    private static Map<String, Integer> virtualRegisterToOffset(IRFunction func) {
         Map<String, Integer> map = new HashMap<>();
 
-        int offset = 0;
+        int $ra_and_$sp_space = 2 * MIPSInstruction.WORD_SIZE; // always stored at top of stack
+        int offset = -1 * $ra_and_$sp_space;
+        
         // give params designated spots on the stack
         List<IRVariableOperand> params = func.parameters;
-        for (int i = 0; i < func.parameters.size(); i++, offset++) {
+        for (int i = 0; i < func.parameters.size(); i++, offset -= MIPSInstruction.WORD_SIZE) {
             String p = params.get(i).getName();
             map.put(p, offset);
         }
+
         // give variables (int-list/float-list) designated spots on the stack
         List<IRVariableOperand> vars = func.variables;
-        for (int i = 0; i < func.variables.size(); i++, offset++) {
+        for (int i = 0; i < func.variables.size(); i++, offset -= MIPSInstruction.WORD_SIZE) {
             String v = vars.get(i).getName();
             map.put(v, offset);
         }
+
+        // allocate space for "temp" virt registers (for storing immediate values in branch instructions)
+        map.put(_tempVirt0, offset);
+        offset -= MIPSInstruction.WORD_SIZE;
+        map.put(_tempVirt1, offset);
 
         return map;
     }
@@ -223,6 +247,9 @@ public class InstructionSelector {
                 size += MIPSInstruction.WORD_SIZE;
             }
         }
+        // space for temporary variables (_tempVirt[0/1])
+        size += 2 * MIPSInstruction.WORD_SIZE;
+
         // align to 8-byte boundary
         int align = 2 * MIPSInstruction.WORD_SIZE;
         int rem = size % align;
