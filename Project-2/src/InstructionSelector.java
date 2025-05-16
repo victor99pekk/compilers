@@ -8,6 +8,7 @@ import ir.IRFunction;
 import ir.IRInstruction;
 import ir.IRProgram;
 import ir.IRReader;
+import ir.operand.IRVariableOperand;
 
 public class InstructionSelector {
     private static final Map<String, String> TEMPLATES = new HashMap<>();
@@ -109,11 +110,54 @@ public class InstructionSelector {
         return lines;
     }
 
+    private static List<String> loadArguments(IRFunction func, Map<String, Integer> vRegToOffset) {
+        List<IRVariableOperand> params = func.parameters;
+
+        int num_mips_arg_registers = 4;
+        
+        List<String> get_args = new ArrayList<>();
+        int i = 0;
+
+        // First four arguments are in the $a_ registers
+        for (; i < num_mips_arg_registers; i++) {
+            String arg_reg = "$a" + Integer.toString(i);
+            String param = params.get(i).getName();
+            int param_offset = vRegToOffset.get(param);
+            String move_arg = "sw " + arg_reg + ", " + Integer.toString(param_offset) + "(" + arg_reg + ")";
+            get_args.add(move_arg);
+        }
+
+        // The rest of the arguments are on the stack and need to be loaded in the function prologue
+        // TODO: HANDLE MORE THAN 4 ARGUMENTS
+
+        return get_args;
+    }
+
     private static String formatReg(String name) {
         if (name == null || name.isEmpty()) return "";
         if (name.matches("\\d+")) return name;  // immediates stay numeric
         if (name.startsWith("$")) return name;
         return "$" + name;
+    }
+
+    Map<String, Integer> virtualRegisterToOffset(IRFunction func) {
+        Map<String, Integer> map = new HashMap<>();
+
+        int offset = 0;
+        // give params designated spots on the stack
+        List<IRVariableOperand> params = func.parameters;
+        for (int i = 0; i < func.parameters.size(); i++, offset++) {
+            String p = params.get(i).getName();
+            map.put(p, offset);
+        }
+        // give variables (int-list/float-list) designated spots on the stack
+        List<IRVariableOperand> vars = func.variables;
+        for (int i = 0; i < func.variables.size(); i++, offset++) {
+            String v = vars.get(i).getName();
+            map.put(v, offset);
+        }
+
+        return map;
     }
 
     public static List<String> instructionSelection(IRProgram program) {
