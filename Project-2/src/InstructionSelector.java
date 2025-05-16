@@ -10,6 +10,7 @@ import ir.IRProgram;
 import ir.IRReader;
 import ir.datatype.IRArrayType;
 import ir.datatype.IRType;
+import ir.operand.IROperand;
 import ir.operand.IRVariableOperand;
 import main.java.mips.MIPSInstruction;
 
@@ -18,26 +19,41 @@ public class InstructionSelector {
     private int fp = 1000;
     private static final Map<String, String> TEMPLATES = new HashMap<>();
     static {
-        TEMPLATES.put("ADD",        "ADD ${dst}, ${lhs}, ${rhs}");
-        TEMPLATES.put("SUB",        "SUB ${dst}, ${lhs}, ${rhs}");
+        TEMPLATES.put("ADD",        "add ${dst}, ${lhs}, ${rhs}");
+        TEMPLATES.put("SUB",        "sub ${dst}, ${lhs}, ${rhs}");
         TEMPLATES.put("MULT",       "MULT ${dst} ${lhs}, ${rhs}");
         TEMPLATES.put("DIV",        "DIV  ${dst} ${lhs}, ${rhs}");
         TEMPLATES.put("AND",        "AND ${dst}, ${lhs}, ${rhs}");
         TEMPLATES.put("OR",         "OR  ${dst}, ${lhs}, ${rhs}");
-        TEMPLATES.put("GOTO",       "J    ${label}");
+        TEMPLATES.put("GOTO",       "j    ${label}");
         TEMPLATES.put("BREQ",       "BEQ  ${lhs}, ${rhs}, ${label}");
         TEMPLATES.put("BRNEQ",      "BNE  ${lhs}, ${rhs}, ${label}");
         TEMPLATES.put("BRLT",       "BLT  ${lhs}, ${rhs}, ${label}");
         TEMPLATES.put("BRGT",       "BGT  ${lhs}, ${rhs}, ${label}");
         TEMPLATES.put("BRLEQ",      "BLE  ${lhs}, ${rhs}, ${label}");
-        TEMPLATES.put("BRGEQ",      "BGE  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("BRGEQ",      "bge  ${lhs}, ${rhs}, ${label}");
         TEMPLATES.put("ARRAY_LOAD", "LW   ${dst}, ${offset}(${base})");
         TEMPLATES.put("ARRAY_STORE","SW   ${src}, ${offset}(${base})");
         TEMPLATES.put("CALL",       "JAL  ${func}");
         TEMPLATES.put("CALLR",      "JAL  ${func}\nMOVE ${dst}, $v0");
         TEMPLATES.put("RETURN",     "JR   $ra");
         TEMPLATES.put("LABEL",      "${label}:");
-        TEMPLATES.put("ASSIGN",     "MOVE ${dst}, ${src}");
+        TEMPLATES.put("ASSIGN",     "lw ${dst}, ${src}");
+    }
+
+    public static boolean isNumeric(String str) {
+        if (str == null) return false;
+        try {
+            Integer.parseInt(str);
+            return true;
+        } catch (NumberFormatException e1) {
+            try {
+                Double.parseDouble(str);
+                return true;
+            } catch (NumberFormatException e2) {
+                return false;
+            }
+        }
     }
 
     private static List<String> selectInstruction(IRInstruction instr) {
@@ -55,11 +71,24 @@ public class InstructionSelector {
         String offset= "";
 
         switch (instr.opCode) {
-            case ADD: case SUB: case MULT: case DIV:
+            case ADD: case MULT: case DIV:
             case AND: case OR:
                 dst = instr.operands[0].toString();
                 lhs = instr.operands[1].toString();
                 rhs = instr.operands[2].toString();
+                break;
+            case SUB:
+                dst = instr.operands[0].toString();
+                lhs = instr.operands[1].toString();
+                rhs = instr.operands[2].toString();
+                if (isNumeric(lhs) || isNumeric(rhs)){
+                    tpl = "addi ${dst}, ${lhs}, ${rhs}";
+                    if (isNumeric(lhs)){
+                        String temporary = rhs;
+                        rhs = lhs;
+                        lhs = temporary;
+                    }
+                }
                 break;
             case ASSIGN:
                 dst = instr.operands[0].toString();
@@ -68,10 +97,22 @@ public class InstructionSelector {
             case GOTO:
                 label = instr.operands[0].toString();
                 break;
-            case BREQ: case BRNEQ: case BRLT: case BRGT: case BRLEQ: case BRGEQ:
+            case BREQ:
                 lhs   = instr.operands[1].toString();
                 rhs   = instr.operands[2].toString();
                 label = instr.operands[0].toString();
+
+                break;
+            case BRNEQ: case BRLT: case BRGT: case BRLEQ: case BRGEQ:
+                lhs   = instr.operands[1].toString();
+                rhs   = instr.operands[2].toString();
+                label = instr.operands[0].toString();
+                if (isNumeric(lhs) || isNumeric(rhs)){
+                    tpl = "addi ${dst}, ${lhs}, ${rhs}";
+                    if (isNumeric(lhs)){
+                        
+                    }
+                }
                 break;
             case ARRAY_LOAD:
                 dst    = instr.operands[0].toString();
@@ -110,7 +151,7 @@ public class InstructionSelector {
                 .replace("${base}",  formatReg(base))
                 .replace("${src}",   formatReg(src))
                 .replace("${offset}", offset);
-            lines.add(filled);
+            lines.add("  " + filled);
         }
         return lines;
     }
@@ -197,8 +238,8 @@ public class InstructionSelector {
             int offset = calculateStackAllocation(fn);
             this.fp = this.pc;
             this.pc += offset;
-            mips.add(" move $fp, $sp");
-            mips.add(" addi $sp, $sp, -" + offset);
+            mips.add("  move $fp, $sp");
+            mips.add("  addi $sp, $sp, -" + offset);
             for (IRInstruction instr : fn.instructions) {
                 mips.addAll(selectInstruction(instr));
             }
