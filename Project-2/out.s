@@ -37,7 +37,8 @@ main:
   lw $t, 0
   JAL  geti
   MOVE $n, $v0
-  BGT  $n, 100, return
+  lw $reg1, $n
+  BGT  $n, $reg2, return
   addi $n, $n, 1
   lw $i, 0
   loop0:

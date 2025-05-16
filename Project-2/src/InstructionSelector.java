@@ -69,7 +69,32 @@ public class InstructionSelector {
         }
     }
 
-    private static List<String> selectInstruction(IRInstruction instr) {
+    private static void storeNumeric(List<List<String>>list, String dst, String src){
+        String tpl = TEMPLATES.get("ASSIGN");
+        String lhs   = "";
+        String rhs   = "";
+        String label = "";
+        String func  = "";
+        String base  = "";
+        String offset= "";
+        List<String> lines = new ArrayList<>();
+        for (String line : tpl.split("\\n")) {
+            String filled = line
+                .replace("${dst}",   formatReg(dst))
+                .replace("${lhs}",   formatReg(lhs))
+                .replace("${rhs}",   formatReg(rhs))
+                .replace("${label}", label)
+                .replace("${func}",  func)
+                .replace("${base}",  formatReg(base))
+                .replace("${src}",   formatReg(src))
+                .replace("${offset}", offset);
+            lines.add("  " + filled);
+        }
+        list.add(lines);
+    }
+
+    private static List<List<String>> selectInstruction(IRInstruction instr) {
+        List<List<String>>list = new ArrayList<>();
         String op = instr.opCode.name();
         String tpl = TEMPLATES.get(op);
         if (tpl == null) throw new IllegalArgumentException("Unmapped opcode: " + op);
@@ -120,11 +145,13 @@ public class InstructionSelector {
                 lhs   = instr.operands[1].toString();
                 rhs   = instr.operands[2].toString();
                 label = instr.operands[0].toString();
-                if (isNumeric(lhs) || isNumeric(rhs)){
-                    tpl = "addi ${dst}, ${lhs}, ${rhs}";
-                    if (isNumeric(lhs)){
-                        
-                    }
+                if (isNumeric(lhs)){
+                    storeNumeric(list, "reg1", lhs);
+                    lhs = "reg1";
+                }
+                if (isNumeric(rhs)){
+                    storeNumeric(list, "reg2", lhs);
+                    rhs = "reg2";
                 }
                 break;
             case ARRAY_LOAD:
@@ -166,7 +193,8 @@ public class InstructionSelector {
                 .replace("${offset}", offset);
             lines.add("  " + filled);
         }
-        return lines;
+        list.add(lines);
+        return list;
     }
 
     private static List<String> loadArguments(IRFunction func, Map<String, Integer> vRegToOffset) {
@@ -268,7 +296,10 @@ public class InstructionSelector {
             mips.add("  move $fp, $sp");
             mips.add("  addi $sp, $sp, -" + offset);
             for (IRInstruction instr : fn.instructions) {
-                mips.addAll(selectInstruction(instr));
+                List<List<String>> list = selectInstruction(instr);
+                for (List<String> instruction : list){
+                    mips.addAll(instruction);
+                }
             }
             mips.add("");
         }
