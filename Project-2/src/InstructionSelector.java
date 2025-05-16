@@ -8,31 +8,30 @@ import ir.IRFunction;
 import ir.IRInstruction;
 import ir.IRProgram;
 import ir.IRReader;
-import main.java.mips.MIPSOp;
 
 public class InstructionSelector {
     private static final Map<String, String> TEMPLATES = new HashMap<>();
     static {
-        TEMPLATES.put("ADD",       "ADD {dst}, {lhs}, {rhs}");
-        TEMPLATES.put("SUB",       "SUB {dst}, {lhs}, {rhs}");
-        TEMPLATES.put("MULT",      "MULT {lhs}, {rhs}\nMFLO {dst}");
-        TEMPLATES.put("DIV",       "DIV {lhs}, {rhs}\nMFLO {dst}");
-        TEMPLATES.put("AND",       "AND {dst}, {lhs}, {rhs}");
-        TEMPLATES.put("OR",        "OR  {dst}, {lhs}, {rhs}");
-        TEMPLATES.put("GOTO",      "J    {label}");
-        TEMPLATES.put("BREQ",      "BEQ  {lhs}, {rhs}, {label}");
-        TEMPLATES.put("BRNEQ",     "BNE  {lhs}, {rhs}, {label}");
-        TEMPLATES.put("BRLT",      "BLT  {lhs}, {rhs}, {label}");
-        TEMPLATES.put("BRGT",      "BGT  {lhs}, {rhs}, {label}");
-        TEMPLATES.put("BRLEQ",     "BLE  {lhs}, {rhs}, {label}");
-        TEMPLATES.put("BRGEQ",     "BGE  {lhs}, {rhs}, {label}");
-        TEMPLATES.put("ARRAY_LOAD","LW   {dst}, {offset}({base})");
-        TEMPLATES.put("ARRAY_STORE","SW  {src}, {offset}({base})");
-        TEMPLATES.put("CALL",      "JAL  {func}");
-        TEMPLATES.put("CALLR",     "JAL  {func}\nMOV  {dst}, ");
-        TEMPLATES.put("RETURN",    "JR   ");
-        TEMPLATES.put("LABEL",     "{label}:");
-        TEMPLATES.put("ASSIGN",     "MOVE {dst}, {src}");
+        TEMPLATES.put("ADD",        "ADD ${dst}, ${lhs}, ${rhs}");
+        TEMPLATES.put("SUB",        "SUB ${dst}, ${lhs}, ${rhs}");
+        TEMPLATES.put("MULT",       "MULT ${lhs}, ${rhs}\nMFLO ${dst}");
+        TEMPLATES.put("DIV",        "DIV ${lhs}, ${rhs}\nMFLO ${dst}");
+        TEMPLATES.put("AND",        "AND ${dst}, ${lhs}, ${rhs}");
+        TEMPLATES.put("OR",         "OR  ${dst}, ${lhs}, ${rhs}");
+        TEMPLATES.put("GOTO",       "J    ${label}");
+        TEMPLATES.put("BREQ",       "BEQ  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("BRNEQ",      "BNE  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("BRLT",       "BLT  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("BRGT",       "BGT  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("BRLEQ",      "BLE  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("BRGEQ",      "BGE  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("ARRAY_LOAD", "LW   ${dst}, ${offset}(${base})");
+        TEMPLATES.put("ARRAY_STORE","SW   ${src}, ${offset}(${base})");
+        TEMPLATES.put("CALL",       "JAL  ${func}");
+        TEMPLATES.put("CALLR",      "JAL  ${func}\nMOVE ${dst}, $v0");
+        TEMPLATES.put("RETURN",     "JR   $ra");
+        TEMPLATES.put("LABEL",      "${label}:");
+        TEMPLATES.put("ASSIGN",     "MOVE ${dst}, ${src}");
     }
 
     private static List<String> selectInstruction(IRInstruction instr) {
@@ -40,7 +39,6 @@ public class InstructionSelector {
         String tpl = TEMPLATES.get(op);
         if (tpl == null) throw new IllegalArgumentException("Unmapped opcode: " + op);
 
-        // Prepare placeholder values
         String dst   = "";
         String lhs   = "";
         String rhs   = "";
@@ -95,17 +93,27 @@ public class InstructionSelector {
                 throw new IllegalArgumentException("Unsupported opcode: " + op);
         }
 
-        String filled = tpl
-            .replace("{dst}", dst)
-            .replace("{lhs}", lhs)
-            .replace("{rhs}", rhs)
-            .replace("{label}", label)
-            .replace("{func}", func)
-            .replace("{base}", base)
-            .replace("{src}", src)
-            .replace("{offset}", offset);
+        List<String> lines = new ArrayList<>();
+        for (String line : tpl.split("\\n")) {
+            String filled = line
+                .replace("${dst}",   formatReg(dst))
+                .replace("${lhs}",   formatReg(lhs))
+                .replace("${rhs}",   formatReg(rhs))
+                .replace("${label}", label)
+                .replace("${func}",  func)
+                .replace("${base}",  formatReg(base))
+                .replace("${src}",   formatReg(src))
+                .replace("${offset}", offset);
+            lines.add(filled);
+        }
+        return lines;
+    }
 
-        return Arrays.asList(filled.split("\n"));
+    private static String formatReg(String name) {
+        if (name == null || name.isEmpty()) return "";
+        if (name.matches("\\d+")) return name;  // immediates stay numeric
+        if (name.startsWith("$")) return name;
+        return "$" + name;
     }
 
     public static List<String> instructionSelection(IRProgram program) {
