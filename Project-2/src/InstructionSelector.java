@@ -8,6 +8,7 @@ import ir.IRFunction;
 import ir.IRInstruction;
 import ir.IRProgram;
 import ir.IRReader;
+import main.java.mips.MIPSOp;
 
 public class InstructionSelector {
     private static final Map<String, String> TEMPLATES = new HashMap<>();
@@ -31,6 +32,7 @@ public class InstructionSelector {
         TEMPLATES.put("CALLR",     "JAL  {func}\nMOV  {dst}, ");
         TEMPLATES.put("RETURN",    "JR   ");
         TEMPLATES.put("LABEL",     "{label}:");
+        TEMPLATES.put("ASSIGN",     "MOVE {dst}, {src}");
     }
 
     private static List<String> selectInstruction(IRInstruction instr) {
@@ -54,6 +56,10 @@ public class InstructionSelector {
                 dst = instr.operands[0].toString();
                 lhs = instr.operands[1].toString();
                 rhs = instr.operands[2].toString();
+                break;
+            case ASSIGN:
+                dst = instr.operands[0].toString();
+                src = instr.operands[1].toString();
                 break;
             case GOTO:
                 label = instr.operands[0].toString();
