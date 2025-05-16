@@ -14,8 +14,8 @@ public class InstructionSelector {
     static {
         TEMPLATES.put("ADD",        "ADD ${dst}, ${lhs}, ${rhs}");
         TEMPLATES.put("SUB",        "SUB ${dst}, ${lhs}, ${rhs}");
-        TEMPLATES.put("MULT",       "MULT ${lhs}, ${rhs}\nMFLO ${dst}");
-        TEMPLATES.put("DIV",        "DIV ${lhs}, ${rhs}\nMFLO ${dst}");
+        TEMPLATES.put("MULT",       "MULT ${dst} ${lhs}, ${rhs}");
+        TEMPLATES.put("DIV",        "DIV  ${dst} ${lhs}, ${rhs}");
         TEMPLATES.put("AND",        "AND ${dst}, ${lhs}, ${rhs}");
         TEMPLATES.put("OR",         "OR  ${dst}, ${lhs}, ${rhs}");
         TEMPLATES.put("GOTO",       "J    ${label}");
