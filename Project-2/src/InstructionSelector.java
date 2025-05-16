@@ -197,6 +197,7 @@ public class InstructionSelector {
         return list;
     }
 
+    /* Return instructions that load arguments into virtual registers (on the stack) */
     private static List<String> loadArguments(IRFunction func, Map<String, Integer> vRegToOffset) {
         List<IRVariableOperand> params = func.parameters;
 
