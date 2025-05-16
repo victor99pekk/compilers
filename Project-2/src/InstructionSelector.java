@@ -227,24 +227,6 @@ public class InstructionSelector {
         list.add(lines);
     }
 
-    private static void createLines(List<List<String>>list, String tpl, String dst, String lhs, String rhs, String label, 
-                                    String func, String base, String src, String offset){
-        List<String> lines = new ArrayList<>();
-        for (String line : tpl.split("\\n")) {
-            String filled = line
-                .replace("${dst}",   formatReg(dst))
-                .replace("${lhs}",   formatReg(lhs))
-                .replace("${rhs}",   formatReg(rhs))
-                .replace("${label}", label)
-                .replace("${func}",  func)
-                .replace("${base}",  formatReg(base))
-                .replace("${src}",   formatReg(src))
-                .replace("${offset}", offset);
-            lines.add("  " + filled);
-        }
-        list.add(lines);
-    }
-
     private static List<String> loadArguments(IRFunction func, Map<String, Integer> vRegToOffset) {
         List<IRVariableOperand> params = func.parameters;
 
