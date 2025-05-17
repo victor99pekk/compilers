@@ -26,10 +26,12 @@ public class InstructionSelector {
      * 
      *     Example 2:
      *     May need to load/store a memory address from/to index into an array
-     *     Can use two register to calculate the address to read/write from/to
+     *     Can use two registers to calculate the address to read/write from/to
      */
     private static String _tempVirt0 = "temp0";
     private static String _tempVirt1 = "temp1";
+
+
     private static final Map<String, String> TEMPLATES = new HashMap<>();
     static {
         TEMPLATES.put("ADD",        "add ${dst}, ${lhs}, ${rhs}");
