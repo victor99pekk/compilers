@@ -70,7 +70,7 @@ public class InstructionSelector {
     }
 
     private static void storeNumeric(List<List<String>>list, String dst, String src){
-        String tpl = "addi ${dst}, $0, ${src}";
+        String tpl = "addi ${dst}, ${src}, $0";
         String lhs   = "";
         String rhs   = "";
         String label = "";
@@ -114,12 +114,12 @@ public class InstructionSelector {
                 rhs   = instr.operands[2].toString();
                 label = instr.operands[0].toString();
                 if (isNumeric(lhs)){
-                    storeNumeric(list, "reg1", lhs);
-                    lhs = "reg1";
+                    storeNumeric(list, _tempVirt0, lhs);
+                    lhs = _tempVirt0;
                 }
                 if (isNumeric(rhs)){
-                    storeNumeric(list, "reg2", lhs);
-                    rhs = "reg2";
+                    storeNumeric(list, _tempVirt1, lhs);
+                    rhs = _tempVirt1;
                 }
                 break;
             case ADD: case DIV:
@@ -154,12 +154,12 @@ public class InstructionSelector {
                 rhs   = instr.operands[2].toString();
                 label = instr.operands[0].toString();
                 if (isNumeric(lhs)){
-                    storeNumeric(list, "reg1", lhs);
-                    lhs = "reg1";
+                    storeNumeric(list, _tempVirt0, lhs);
+                    lhs = _tempVirt0;
                 }
                 if (isNumeric(rhs)){
-                    storeNumeric(list, "reg2", lhs);
-                    rhs = "reg2";
+                    storeNumeric(list, _tempVirt1, lhs);
+                    rhs = _tempVirt1;
                 }
                 break;
             case ARRAY_LOAD:
