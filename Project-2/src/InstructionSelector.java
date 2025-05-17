@@ -49,9 +49,9 @@ public class InstructionSelector {
         TEMPLATES.put("BRGEQ",      "bge  ${lhs}, ${rhs}, ${label}");
         TEMPLATES.put("ARRAY_LOAD", "LW   ${dst}, ${offset}(${base})");
         TEMPLATES.put("ARRAY_STORE","SW   ${src}, ${offset}(${base})");
-        TEMPLATES.put("CALL",       "JAL  ${func}");
+        TEMPLATES.put("CALL",       "jal ${func}");
         TEMPLATES.put("CALLR",      "JAL  ${func}\nMOVE ${dst}, $v0");
-        TEMPLATES.put("RETURN",     "JR   $ra");
+        TEMPLATES.put("RETURN",     "jr   $ra");
         TEMPLATES.put("LABEL",      "${label}:");
         TEMPLATES.put("ASSIGN",     "lw ${dst}, ${src}");
     }
@@ -94,6 +94,55 @@ public class InstructionSelector {
         }
         list.add(lines);
     }
+
+    private static void sw(List<List<String>>list, String dst, String src){
+        String tpl = "sw ${dst}, $0, ${src}";
+        String lhs   = "";
+        String rhs   = "";
+        String label = "";
+        String func  = "";
+        String base  = "";
+        String offset= "";
+        List<String> lines = new ArrayList<>();
+        for (String line : tpl.split("\\n")) {
+            String filled = line
+                .replace("${dst}",   formatReg(dst))
+                .replace("${lhs}",   formatReg(lhs))
+                .replace("${rhs}",   formatReg(rhs))
+                .replace("${label}", label)
+                .replace("${func}",  func)
+                .replace("${base}",  formatReg(base))
+                .replace("${src}",   formatReg(src))
+                .replace("${offset}", offset);
+            lines.add("  " + filled);
+        }
+        list.add(lines);
+    }
+
+    private static void addi(List<List<String>>list, String dst, String rhs, String lhs){
+        String tpl = "addi ${dst}, $0, ${src}";
+        String src   = "";
+        String label = "";
+        String func  = "";
+        String base  = "";
+        String offset= "";
+        List<String> lines = new ArrayList<>();
+        for (String line : tpl.split("\\n")) {
+            String filled = line
+                .replace("${dst}",   formatReg(dst))
+                .replace("${lhs}",   formatReg(lhs))
+                .replace("${rhs}",   formatReg(rhs))
+                .replace("${label}", label)
+                .replace("${func}",  func)
+                .replace("${base}",  formatReg(base))
+                .replace("${src}",   formatReg(src))
+                .replace("${offset}", offset);
+            lines.add("  " + filled);
+        }
+        list.add(lines);
+    }
+
+    
 
     private static List<List<String>> selectInstruction(IRInstruction instr) {
         List<List<String>>list = new ArrayList<>();
@@ -179,6 +228,7 @@ public class InstructionSelector {
                 offset = instr.operands[2].toString();
                 break;
             case CALL:
+                addi(list, "$(sp)", "$(sp)", "-8");
                 func = instr.operands[0].toString();
                 break;
             case CALLR:
@@ -211,23 +261,6 @@ public class InstructionSelector {
         return list;
     }
 
-    private static void createLines(List<List<String>>list, String tpl, String dst, String lhs, String rhs, String label, 
-                                    String func, String base, String src, String offset){
-        List<String> lines = new ArrayList<>();
-        for (String line : tpl.split("\\n")) {
-            String filled = line
-                .replace("${dst}",   formatReg(dst))
-                .replace("${lhs}",   formatReg(lhs))
-                .replace("${rhs}",   formatReg(rhs))
-                .replace("${label}", label)
-                .replace("${func}",  func)
-                .replace("${base}",  formatReg(base))
-                .replace("${src}",   formatReg(src))
-                .replace("${offset}", offset);
-            lines.add("  " + filled);
-        }
-        list.add(lines);
-    }
 
     private static List<String> loadArguments(IRFunction func, Map<String, Integer> vRegToOffset) {
         List<IRVariableOperand> params = func.parameters;
