@@ -8,6 +8,9 @@
 # outputted ir file
 */out.ir
 
+# outputted asm file
+*.s
+
 # graphs
 *.png
 
