@@ -14,6 +14,6 @@
 # Produces out . s
 # run.sh path/to/file.ir --greedy
 # Produces out . s
-
+# ./run.sh public_test_cases/quicksort/quicksort.ir
 
 java -cp bin/ Main $1

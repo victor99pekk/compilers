@@ -217,16 +217,44 @@ public class InstructionSelector {
                 dst    = instr.operands[0].toString();
                 base   = instr.operands[1].toString();
                 offset = instr.operands[2].toString();
+                // addi  $t0, $fp, 0       # 2a) load base pointer ($fp) into $t0
                 storeNumeric(list, "arr", base);
+
+                // sll   $t3, $t4, 2       # 1) index ($t4) × 4 → byte offset in $t3
+                createLines(list, "sll ${dst}, {base}", "dst", "", "", "", "", "base", "", "");
+                createLines(list, "addi ${dst}, {lhs}, {src}", "t0", "fp", "", "", "", "", "0", "");
+
+                // sub   $t0, $t0, $t3     # 2b) element address = $fp – offset
+                createLines(list, "sub ${dst}, {lhs}, {src}", "t0", "t0", "", "", "", "", "dst", "");
+
+                // sw    $t2, 0($t0)       # 3) store word in $t2 → Mem[element_addr]
+                createLines(list, "sw ${dst}, {offset}${base}", "dst", "", "", "", "", "base", "dst", "t0");
+
                 storeNumeric(list, "offset", offset);
                 // sll   $t2, $t1, 2   # $t2 = $t1 << 2
-                createLines(list, "la $rt, {base}", dst, lhs, rhs, label, func, base, src, offset);
-                break;
+                return list;
+                // break;
             case ARRAY_STORE:
                 src    = instr.operands[0].toString();
                 base   = instr.operands[1].toString();
                 offset = instr.operands[2].toString();
-                break;
+
+                // addi  $t0, $fp, 0       # 2a) load base pointer ($fp) into $t0
+                storeNumeric(list, "arr", base);
+
+                // sll   $t3, $t4, 2       # 1) index ($t4) × 4 → byte offset in $t3
+                createLines(list, "sll ${dst}, {base}", "dst", "", "", "", "", "base", "", "");
+                createLines(list, "addi ${dst}, {lhs}, {src}", "t0", "fp", "", "", "", "", "0", "");
+
+                // sub   $t0, $t0, $t3     # 2b) element address = $fp – offset
+                createLines(list, "sub ${dst}, {lhs}, {src}", "t0", "t0", "", "", "", "", "dst", "");
+
+                // sw    $src, 0($t0)      # 3) store word in $src → Mem[element_addr]
+                createLines(list, "sw ${src}, {offset}${base}", src, "", "", "", "", "base", "dst", "t0");
+
+                storeNumeric(list, "offset", offset);
+                // sll   $t2, $t1, 2   # $t2 = $t1 << 2
+                return list;
             case CALL:
                 addi(list, "$(sp)", "$(sp)", "-8");
                 func = instr.operands[0].toString();
@@ -236,6 +264,7 @@ public class InstructionSelector {
                 dst  = instr.operands[0].toString();
                 break;
             case RETURN:
+                createLines(list, tpl, dst, lhs, rhs, label, func, base, src, offset);
                 break;
             case LABEL:
                 label = instr.operands[0].toString();
@@ -259,6 +288,24 @@ public class InstructionSelector {
         }
         list.add(lines);
         return list;
+    }
+
+    private static void createLines(List<List<String>>list, String tpl, String dst, String lhs, String rhs,
+                                    String label, String func, String base, String src, String offset){
+        List<String> lines = new ArrayList<>();
+        for (String line : tpl.split("\\n")) {
+            String filled = line
+                .replace("${dst}",   formatReg(dst))
+                .replace("${lhs}",   formatReg(lhs))
+                .replace("${rhs}",   formatReg(rhs))
+                .replace("${label}", label)
+                .replace("${func}",  func)
+                .replace("${base}",  formatReg(base))
+                .replace("${src}",   formatReg(src))
+                .replace("${offset}", offset);
+            lines.add("  " + filled);
+        }
+        list.add(lines);
     }
 
 
@@ -353,6 +400,7 @@ public class InstructionSelector {
 
     public List<String> instructionSelection(IRProgram program) {
         List<String> mips = new ArrayList<>();
+        mips.add(".text");
         for (IRFunction fn : program.functions) {
             mips.add(fn.name + ":");
             int offset = calculateStackAllocation(fn);
@@ -360,6 +408,7 @@ public class InstructionSelector {
             this.pc += offset;
             mips.add("  move $fp, $sp");
             mips.add("  addi $sp, $sp, -" + offset);
+            Collections.reverse(fn.instructions);
             for (IRInstruction instr : fn.instructions) {
                 List<List<String>> list = selectInstruction(instr);
                 for (List<String> instruction : list){
