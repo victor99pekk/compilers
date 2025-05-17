@@ -1,29 +1,12 @@
-# Variables
-SRC := $(shell find . -name "*.java")
-BIN := bin
-MAIN := Main
-CLASSDIR := $(BIN)
-JFLAGS := -d $(CLASSDIR)
+.PHONY: all run clean
 
-# Default target: compile the code
-all: $(CLASSDIR)/$(MAIN).class
+all:
+	@mkdir -p bin
+	@javac -d bin $(shell find . -name '*.java')
 
-# Create bin directory if it doesn't exist
-$(CLASSDIR):
-	mkdir -p $(CLASSDIR)
-
-# Compile all Java files
-$(CLASSDIR)/$(MAIN).class: $(SRC) | $(CLASSDIR)
-	javac $(JFLAGS) $(SRC)
-
-# Run backend: takes 2 arguments: input file and --naive or --greedy
 run: all
-	@if [ -z "$(file)" ] || [ -z "$(mode)" ]; then \
-		echo "Usage: make run file=path/to/file.ir mode=--naive|--greedy"; \
-		exit 1; \
-	fi
-	java -cp $(CLASSDIR) $(MAIN) $(file) $(mode)
+	@java -cp bin/ Main public_test_cases/quicksort/quicksort.ir
 
-# Clean up
+	# ./run.sh 
 clean:
-	rm -rf $(BIN)
+	@rm -rf bin

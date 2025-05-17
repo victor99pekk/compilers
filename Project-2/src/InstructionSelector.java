@@ -401,6 +401,7 @@ public class InstructionSelector {
     public List<String> instructionSelection(IRProgram program) {
         List<String> mips = new ArrayList<>();
         mips.add(".text");
+        Collections.reverse(program.functions); // to print the main function first
         for (IRFunction fn : program.functions) {
             mips.add(fn.name + ":");
             int offset = calculateStackAllocation(fn);
@@ -408,7 +409,6 @@ public class InstructionSelector {
             this.pc += offset;
             mips.add("  move $fp, $sp");
             mips.add("  addi $sp, $sp, -" + offset);
-            Collections.reverse(fn.instructions);
             for (IRInstruction instr : fn.instructions) {
                 List<List<String>> list = selectInstruction(instr);
                 for (List<String> instruction : list){
