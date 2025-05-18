@@ -314,14 +314,15 @@ public class InstructionSelector {
                     offset = getRegister(offset,    false);
                 }
                 base = getRegister(base, false);
-                src  = getRegister(src, true);
+                src  = getRegister(src, false);
 
                 // sll $t1, offset, 2      # offset (index) * 4 (word size)
                 createLines(list, "sll ${dst}, ${lhs}, 2", _tempVirt1, offset, "", "", "", "", "", "");
                 // add $t2, base, $t1      # address = base + offset*4
                 createLines(list, "add ${dst}, ${lhs}, ${rhs}", _tempVirt0, base, _tempVirt1, "", "", "", "", "");
                 // sw src, 0($t2)          # store word to address
-                createLines(list, "sw ${src}, 0(${base})", src, "", "", "", "", _tempVirt0, "", "");
+                // offset = offset;
+                createLines(list, "sw ${src}, {offset}(${base})", src, "", "", "", "", _tempVirt0, "", offset);
                 return list;
             case CALL:
                 Set<String> used = T_registers_used_by_func.peek();

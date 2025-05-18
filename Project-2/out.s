@@ -18,7 +18,7 @@ loop0_main:
   move $t2, $v0
   sll $t1, $t5, 2
   add $t0, $t6, $t1
-  sw , 0($t0)
+  sw , {offset}($t0)
   addi $t1, $t5, $0
   add , $t5, $t1
   j    loop0
@@ -74,10 +74,10 @@ loop2_quicksort:
   bge  $t2, $t3, exit0
   sll $t1, $t3, 2
   add $t0, $t7, $t1
-  sw , 0($t0)
+  sw , {offset}($t0)
   sll $t1, $t2, 2
   add $t0, $t7, $t1
-  sw , 0($t0)
+  sw , {offset}($t0)
   j    loop0
 exit0_quicksort:
   addi $t1, $t3, $0
