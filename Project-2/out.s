@@ -6,41 +6,34 @@ main:
   JAL  geti
   MOVE $n, $v0
   addi $temp1, $n, $0
-  BGT  $n, $temp1, return
+  bgt  $n, $temp1, return
   addi $n, $n, 1
   lw $i, 0
-  loop0:
-  BGT  $i, $n, exit0
+loop0
+  bgt  $i, $n, exit0
   JAL  geti
   MOVE $t, $v0
-  addi $arr, $A, $0
-  sll $dst, {base}
-  addi $t0, {lhs}, {src}
-  sub $t0, {lhs}, {src}
-  sw $dst, {offset}$base
-  addi $offset, $i, $0
-  add $i, $i, 1
+  sll $temp1, $i, 2
+  add $temp0, $A, $temp1
+  sw , 0($temp0)
+  addi $temp1, $i, $0
+  add , $i, $temp1
   j    loop0
-  exit0:
-  addi $(sp), $0, 
-  jal quicksort
+exit0
+  jal 
   lw $i, 0
-  loop1:
-  BGT  $i, $n, exit1
-  addi $arr, $A, $0
-  sll $dst, {base}
-  addi $t0, {lhs}, {src}
-  sub $t0, {lhs}, {src}
-  sw $dst, {offset}$base
-  addi $offset, $i, $0
-  addi $(sp), $0, 
-  jal puti
-  addi $(sp), $0, 
-  jal putc
-  add $i, $i, 1
+loop1
+  bgt  $i, $n, exit1
+  sll $temp1, $i, 2
+  add $temp0, $A, $temp1
+  lw $t, 0($temp0)
+  jal 
+  jal 
+  addi $temp1, $i, $0
+  add , $i, $temp1
   j    loop1
-  exit1:
-  return:
+exit1
+return
 
 quicksort:
   move $fp, $sp
@@ -48,57 +41,45 @@ quicksort:
   lw $i, 0
   lw $j, 0
   bge  $lo, $hi, end
-  add $mid, $lo, $hi
-  DIV  $mid $mid, 2
-  addi $arr, $A, $0
-  sll $dst, {base}
-  addi $t0, {lhs}, {src}
-  sub $t0, {lhs}, {src}
-  sw $dst, {offset}$base
-  addi $offset, $mid, $0
+  add , $lo, $hi
+  addi $temp1, $mid, $0
+  div   $mid, $temp1
+  sll $temp1, $mid, 2
+  add $temp0, $A, $temp1
+  lw $pivot, 0($temp0)
   addi $i, $lo, 1
-  add $j, $hi, 1
-  loop0:
-  loop1:
-  add $i, $i, 1
-  addi $arr, $A, $0
-  sll $dst, {base}
-  addi $t0, {lhs}, {src}
-  sub $t0, {lhs}, {src}
-  sw $dst, {offset}$base
-  addi $offset, $i, $0
+  addi $temp1, $hi, $0
+  add , $hi, $temp1
+loop0
+loop1
+  addi $temp1, $i, $0
+  add , $i, $temp1
+  sll $temp1, $i, 2
+  add $temp0, $A, $temp1
+  lw $x, 0($temp0)
   lw $ti, $x
-  BLT  $ti, $pivot, loop1
-  loop2:
+  blt  $ti, $pivot, loop1
+loop2
   addi $j, $j, 1
-  addi $arr, $A, $0
-  sll $dst, {base}
-  addi $t0, {lhs}, {src}
-  sub $t0, {lhs}, {src}
-  sw $dst, {offset}$base
-  addi $offset, $j, $0
+  sll $temp1, $j, 2
+  add $temp0, $A, $temp1
+  lw $x, 0($temp0)
   lw $tj, $x
-  BGT  $tj, $pivot, loop2
+  bgt  $tj, $pivot, loop2
   bge  $i, $j, exit0
-  addi $arr, $A, $0
-  sll $dst, {base}
-  addi $t0, {lhs}, {src}
-  sub $t0, {lhs}, {src}
-  sw $dst, {offset}$base
-  addi $offset, $j, $0
-  addi $arr, $A, $0
-  sll $dst, {base}
-  addi $t0, {lhs}, {src}
-  sub $t0, {lhs}, {src}
-  sw $dst, {offset}$base
-  addi $offset, $i, $0
+  sll $temp1, $j, 2
+  add $temp0, $A, $temp1
+  sw , 0($temp0)
+  sll $temp1, $i, 2
+  add $temp0, $A, $temp1
+  sw , 0($temp0)
   j    loop0
-  exit0:
-  add $j1, $j, 1
-  addi $(sp), $0, 
-  jal quicksort
-  add $j, $j, 1
-  addi $(sp), $0, 
-  jal quicksort
-  end:
+exit0
+  addi $temp1, $j, $0
+  add , $j, $temp1
+  jal 
+  addi $temp1, $j, $0
+  add , $j, $temp1
+  jal 
+end
 

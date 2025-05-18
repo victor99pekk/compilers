@@ -15,8 +15,6 @@ import ir.operand.IRVariableOperand;
 import main.java.mips.MIPSInstruction;
 
 public class InstructionSelector {
-    private int pc = 1000;
-    private int fp = 1000;
 
     /* 'temp' virtual registers for storing immediates
      *     Example 1:
@@ -30,25 +28,36 @@ public class InstructionSelector {
      */
     private static String _tempVirt0 = "temp0";
     private static String _tempVirt1 = "temp1";
+    private int pc = 1000;
+    private int fp = 1000;
+    // private Map<String, List<String>> S_registers_used_by_func = new HashMap<>();
+    // private Map<String, List<String>> T_registers_used_by_func = new HashMap<>();
+    Stack<Set<String>> S_registers_used_by_func = new Stack<>();
+    Stack<Set<String>> T_registers_used_by_func = new Stack<>();
+    private int registerT_count = 0;
+    private int registerS_count = 0;
+    private Map<String, String> S_registers = new HashMap<>();
+    private Map<String, String> T_registers = new HashMap<>();
+
 
 
     private static final Map<String, String> TEMPLATES = new HashMap<>();
     static {
         TEMPLATES.put("ADD",        "add ${dst}, ${lhs}, ${rhs}");
         TEMPLATES.put("SUB",        "sub ${dst}, ${lhs}, ${rhs}");
-        TEMPLATES.put("MULT",       "MULT ${dst} ${lhs}, ${rhs}");
-        TEMPLATES.put("DIV",        "DIV  ${dst} ${lhs}, ${rhs}");
-        TEMPLATES.put("AND",        "AND ${dst}, ${lhs}, ${rhs}");
+        TEMPLATES.put("MULT",       "mul ${dst} ${lhs}, ${rhs}");
+        TEMPLATES.put("DIV",        "div  ${dst} ${lhs}, ${rhs}");
+        TEMPLATES.put("AND",        "and ${dst}, ${lhs}, ${rhs}");
         TEMPLATES.put("OR",         "OR  ${dst}, ${lhs}, ${rhs}");
         TEMPLATES.put("GOTO",       "j    ${label}");
-        TEMPLATES.put("BREQ",       "BEQ  ${lhs}, ${rhs}, ${label}");
-        TEMPLATES.put("BRNEQ",      "BNE  ${lhs}, ${rhs}, ${label}");
-        TEMPLATES.put("BRLT",       "BLT  ${lhs}, ${rhs}, ${label}");
-        TEMPLATES.put("BRGT",       "BGT  ${lhs}, ${rhs}, ${label}");
-        TEMPLATES.put("BRLEQ",      "BLE  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("BREQ",       "beq  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("BRNEQ",      "bne  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("BRLT",       "blt  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("BRGT",       "bgt  ${lhs}, ${rhs}, ${label}");
+        TEMPLATES.put("BRLEQ",      "ble  ${lhs}, ${rhs}, ${label}");
         TEMPLATES.put("BRGEQ",      "bge  ${lhs}, ${rhs}, ${label}");
-        TEMPLATES.put("ARRAY_LOAD", "LW   ${dst}, ${offset}(${base})");
-        TEMPLATES.put("ARRAY_STORE","SW   ${src}, ${offset}(${base})");
+        TEMPLATES.put("ARRAY_LOAD", "la   ${dst}, ${offset}(${base})");
+        TEMPLATES.put("ARRAY_STORE","sw   ${src}, ${offset}(${base})");
         TEMPLATES.put("CALL",       "jal ${func}");
         TEMPLATES.put("CALLR",      "JAL  ${func}\nMOVE ${dst}, $v0");
         TEMPLATES.put("RETURN",     "jr   $ra");
@@ -142,13 +151,17 @@ public class InstructionSelector {
         list.add(lines);
     }
 
-    
 
-    private static List<List<String>> selectInstruction(IRInstruction instr) {
+    private List<List<String>> selectInstruction(IRInstruction instr) {
         List<List<String>>list = new ArrayList<>();
         String op = instr.opCode.name();
         String tpl = TEMPLATES.get(op);
+        boolean is_label = false;
         if (tpl == null) throw new IllegalArgumentException("Unmapped opcode: " + op);
+
+        if (instr.opCode == IRInstruction.OpCode.LABEL) {
+            return List.of(List.of(instr.operands[0].toString()));
+        }
 
         String dst   = "";
         String lhs   = "";
@@ -167,17 +180,35 @@ public class InstructionSelector {
                 if (isNumeric(lhs)){
                     storeNumeric(list, _tempVirt0, lhs);
                     lhs = _tempVirt0;
+                }else{
+                    lhs = getRegister(lhs);
                 }
                 if (isNumeric(rhs)){
                     storeNumeric(list, _tempVirt1, lhs);
                     rhs = _tempVirt1;
+                }else{
+                    rhs = getRegister(rhs);
                 }
+                label = getRegister(label);
                 break;
             case ADD: case DIV:
-            case AND: case OR:
-                dst = instr.operands[0].toString();
-                lhs = instr.operands[1].toString();
-                rhs = instr.operands[2].toString();
+            case AND: case OR: // todo: finish register allocation
+                lhs   = instr.operands[1].toString();
+                rhs   = instr.operands[2].toString();
+                label = instr.operands[0].toString();
+                if (isNumeric(lhs)){
+                    storeNumeric(list, _tempVirt0, lhs);
+                    lhs = _tempVirt0;
+                }else{
+                    lhs = getRegister(lhs);
+                }
+                if (isNumeric(rhs)){
+                    storeNumeric(list, _tempVirt1, lhs);
+                    rhs = _tempVirt1;
+                }else{
+                    rhs = getRegister(rhs);
+                }
+                label = getRegister(label);
                 break;
             case SUB:
                 dst = instr.operands[0].toString();
@@ -185,16 +216,31 @@ public class InstructionSelector {
                 rhs = instr.operands[2].toString();
                 if (isNumeric(lhs) || isNumeric(rhs)){
                     tpl = "addi ${dst}, ${lhs}, ${rhs}";
-                    if (isNumeric(lhs)){
+                    if (isNumeric(lhs) && !isNumeric(rhs)){
                         String temporary = rhs;
                         rhs = lhs;
                         lhs = temporary;
+                        storeNumeric(list, _tempVirt0, rhs);
+                        rhs = _tempVirt0;
+                    }else if (!isNumeric(lhs) && !isNumeric(rhs)){
+                        storeNumeric(list, _tempVirt0, rhs);
+                        rhs = _tempVirt0;
+                        storeNumeric(list, _tempVirt1, lhs);
+                        lhs = _tempVirt1;
                     }
+                }else{
+                    lhs = getRegister(lhs);
+                    rhs = getRegister(rhs);
+                    dst = getRegister(dst);
                 }
                 break;
             case ASSIGN:
                 dst = instr.operands[0].toString();
                 src = instr.operands[1].toString();
+                if (!isNumeric(src)){
+                    src = getRegister(src);
+                }
+                dst = getRegister(dst);
                 break;
             case GOTO:
                 label = instr.operands[0].toString();
@@ -217,21 +263,23 @@ public class InstructionSelector {
                 dst    = instr.operands[0].toString();
                 base   = instr.operands[1].toString();
                 offset = instr.operands[2].toString();
-                // addi  $t0, $fp, 0       # 2a) load base pointer ($fp) into $t0
-                storeNumeric(list, "arr", base);
 
-                // sll   $t3, $t4, 2       # 1) index ($t4) × 4 → byte offset in $t3
-                createLines(list, "sll ${dst}, {base}", "dst", "", "", "", "", "base", "", "");
-                createLines(list, "addi ${dst}, {lhs}, {src}", "t0", "fp", "", "", "", "", "0", "");
+                // If offset is numeric, store it in a temp register
+                if (isNumeric(offset)) {
+                    storeNumeric(list, _tempVirt0, offset);
+                    offset = _tempVirt0;
+                } else {
+                    offset = getRegister(offset);
+                }
+                base = getRegister(base);
+                dst  = getRegister(dst);
 
-                // sub   $t0, $t0, $t3     # 2b) element address = $fp – offset
-                createLines(list, "sub ${dst}, {lhs}, {src}", "t0", "t0", "", "", "", "", "dst", "");
-
-                // sw    $t2, 0($t0)       # 3) store word in $t2 → Mem[element_addr]
-                createLines(list, "sw ${dst}, {offset}${base}", "dst", "", "", "", "", "base", "dst", "t0");
-
-                storeNumeric(list, "offset", offset);
-                // sll   $t2, $t1, 2   # $t2 = $t1 << 2
+                // sll $t1, offset, 2      # offset (index) * 4 (word size)
+                createLines(list, "sll ${dst}, ${lhs}, 2", _tempVirt1, offset, "", "", "", "", "", "");
+                // add $t2, base, $t1      # address = base + offset*4
+                createLines(list, "add ${dst}, ${lhs}, ${rhs}", _tempVirt0, base, _tempVirt1, "", "", "", "", "");
+                // lw dst, 0($t2)          # load word from address
+                createLines(list, "lw ${dst}, 0(${base})", dst, "", "", "", "", _tempVirt0, "", "");
                 return list;
                 // break;
             case ARRAY_STORE:
@@ -239,26 +287,28 @@ public class InstructionSelector {
                 base   = instr.operands[1].toString();
                 offset = instr.operands[2].toString();
 
-                // addi  $t0, $fp, 0       # 2a) load base pointer ($fp) into $t0
-                storeNumeric(list, "arr", base);
+                if (isNumeric(offset)) {
+                    storeNumeric(list, _tempVirt0, offset);
+                    offset = _tempVirt0;
+                } else {
+                    offset = getRegister(offset);
+                }
+                base = getRegister(base);
+                src  = getRegister(src);
 
-                // sll   $t3, $t4, 2       # 1) index ($t4) × 4 → byte offset in $t3
-                createLines(list, "sll ${dst}, {base}", "dst", "", "", "", "", "base", "", "");
-                createLines(list, "addi ${dst}, {lhs}, {src}", "t0", "fp", "", "", "", "", "0", "");
-
-                // sub   $t0, $t0, $t3     # 2b) element address = $fp – offset
-                createLines(list, "sub ${dst}, {lhs}, {src}", "t0", "t0", "", "", "", "", "dst", "");
-
-                // sw    $src, 0($t0)      # 3) store word in $src → Mem[element_addr]
-                createLines(list, "sw ${src}, {offset}${base}", src, "", "", "", "", "base", "dst", "t0");
-
-                storeNumeric(list, "offset", offset);
-                // sll   $t2, $t1, 2   # $t2 = $t1 << 2
+                // sll $t1, offset, 2      # offset (index) * 4 (word size)
+                createLines(list, "sll ${dst}, ${lhs}, 2", _tempVirt1, offset, "", "", "", "", "", "");
+                // add $t2, base, $t1      # address = base + offset*4
+                createLines(list, "add ${dst}, ${lhs}, ${rhs}", _tempVirt0, base, _tempVirt1, "", "", "", "", "");
+                // sw src, 0($t2)          # store word to address
+                createLines(list, "sw ${src}, 0(${base})", src, "", "", "", "", _tempVirt0, "", "");
                 return list;
             case CALL:
-                addi(list, "$(sp)", "$(sp)", "-8");
-                func = instr.operands[0].toString();
-                break;
+                Set<String> used = T_registers_used_by_func.peek();
+                prepareFunctionCall(used);
+                createLines(list, tpl, dst, lhs, rhs, label, func, base, src, offset);
+                restoreFunctionCall(used);
+                return list;
             case CALLR:
                 func = instr.operands[1].toString();
                 dst  = instr.operands[0].toString();
@@ -267,6 +317,7 @@ public class InstructionSelector {
                 createLines(list, tpl, dst, lhs, rhs, label, func, base, src, offset);
                 break;
             case LABEL:
+                is_label = true;
                 label = instr.operands[0].toString();
                 break;
             default:
@@ -284,10 +335,32 @@ public class InstructionSelector {
                 .replace("${base}",  formatReg(base))
                 .replace("${src}",   formatReg(src))
                 .replace("${offset}", offset);
-            lines.add("  " + filled);
+            if (is_label) {
+                filled = filled.replace(":", ""); // remove colon from label
+            }else{
+                lines.add("  " + filled);
+            }
         }
         list.add(lines);
         return list;
+    }
+
+    private String getRegister(String dst) {
+        if (dst.startsWith("$t")) {
+            if (T_registers.get(dst) == null) {
+                T_registers.put(dst, "$t" + registerT_count);
+                registerT_count++;
+            }
+            dst = T_registers.get(dst);
+        }
+        if (dst.startsWith("$s")) {
+            if (S_registers.get(dst) == null) {
+                S_registers.put(dst, "$s" + registerS_count);
+                registerS_count++;
+            }
+            dst = S_registers.get(dst);
+        }
+        return dst;
     }
 
     private static void createLines(List<List<String>>list, String tpl, String dst, String lhs, String rhs,
@@ -397,12 +470,60 @@ public class InstructionSelector {
         return size;
     }
 
+    // private void prepareFunctionCall(IRFunction fn) {
+    //     List<String> used = T_registers_used_by_func.get(fn.name);
+    //     if (used == null) {
+    //         used = new ArrayList<>();
+    //         S_registers_used_by_func.put(fn.name, used);
+    //     }
+    //     for (int i = 0; i < used.size(); i++) { // Save all used registers
+    //         String reg = used.get(i);
+    //         if (reg.startsWith("$t")) {
+    //             String move = "sw " + reg + ", " + Integer.toString(i * MIPSInstruction.WORD_SIZE) + "$(sp)";
+    //             used.add(move);
+    //         }
+    //     }
+    // }
+
+    private void prepareFunctionCall(Set<String> u) {
+        List<String> used = new ArrayList<>(u);
+        int stack_offset = used.size() * MIPSInstruction.WORD_SIZE;
+        for (int i = 0; i < used.size(); i++) { // Save all used registers
+            String reg = used.get(i);
+            if (reg.startsWith("$t")) {
+                String move = "sw " + reg + ", " + Integer.toString(i * MIPSInstruction.WORD_SIZE) + "$(sp)";
+                used.add(move);
+            }
+        }
+    }
+
+    private void restoreFunctionCall(Set<String> u) {
+        List<String> used = new ArrayList<>(u);
+        int stack_offset = used.size() * MIPSInstruction.WORD_SIZE;
+        for (int i = 0; i < used.size(); i++) { // Restore all used registers
+            String reg = used.get(i);
+            if (reg.startsWith("$t")) {
+                String move = "lw " + reg + ", " + Integer.toString(i * MIPSInstruction.WORD_SIZE) + "$(sp)";
+                used.add(move);
+            }
+        }
+    }
+
+        
+
 
     public List<String> instructionSelection(IRProgram program) {
         List<String> mips = new ArrayList<>();
         mips.add(".text");
         Collections.reverse(program.functions); // to print the main function first
         for (IRFunction fn : program.functions) {
+            T_registers_used_by_func.push(new HashSet<>());
+            S_registers_used_by_func.push(new HashSet<>());
+            registerS_count = 0;
+            registerT_count = 0;
+            S_registers.clear();
+            T_registers.clear();
+
             mips.add(fn.name + ":");
             int offset = calculateStackAllocation(fn);
             this.fp = this.pc;
