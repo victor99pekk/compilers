@@ -26,15 +26,17 @@ public class InstructionSelector {
      *     May need to load/store a memory address from/to index into an array
      *     Can use two registers to calculate the address to read/write from/to
      */
-    private static String _tempVirt0 = "temp0";
-    private static String _tempVirt1 = "temp1";
+    // private static String _tempVirt0 = "temp0";
+    // private static String _tempVirt1 = "temp1";
+    private static String _tempVirt0 = "$t0";
+    private static String _tempVirt1 = "$t1";
     private int pc = 1000;
     private int fp = 1000;
     // private Map<String, List<String>> S_registers_used_by_func = new HashMap<>();
     // private Map<String, List<String>> T_registers_used_by_func = new HashMap<>();
     Stack<Set<String>> S_registers_used_by_func = new Stack<>();
     Stack<Set<String>> T_registers_used_by_func = new Stack<>();
-    private int registerT_count = 0;
+    private int registerT_count = 2;
     private int registerS_count = 0;
     private Map<String, String> S_registers = new HashMap<>();
     private Map<String, String> T_registers = new HashMap<>();
@@ -45,10 +47,10 @@ public class InstructionSelector {
     static {
         TEMPLATES.put("ADD",        "add ${dst}, ${lhs}, ${rhs}");
         TEMPLATES.put("SUB",        "sub ${dst}, ${lhs}, ${rhs}");
-        TEMPLATES.put("MULT",       "mul ${dst} ${lhs}, ${rhs}");
-        TEMPLATES.put("DIV",        "div  ${dst} ${lhs}, ${rhs}");
+        TEMPLATES.put("MULT",       "mul ${dst}, ${lhs}, ${rhs}");
+        TEMPLATES.put("DIV",        "div  ${dst}, ${lhs}, ${rhs}");
         TEMPLATES.put("AND",        "and ${dst}, ${lhs}, ${rhs}");
-        TEMPLATES.put("OR",         "OR  ${dst}, ${lhs}, ${rhs}");
+        TEMPLATES.put("OR",         "or  ${dst}, ${lhs}, ${rhs}");
         TEMPLATES.put("GOTO",       "j    ${label}");
         TEMPLATES.put("BREQ",       "beq  ${lhs}, ${rhs}, ${label}");
         TEMPLATES.put("BRNEQ",      "bne  ${lhs}, ${rhs}, ${label}");
@@ -59,10 +61,10 @@ public class InstructionSelector {
         TEMPLATES.put("ARRAY_LOAD", "la   ${dst}, ${offset}(${base})");
         TEMPLATES.put("ARRAY_STORE","sw   ${src}, ${offset}(${base})");
         TEMPLATES.put("CALL",       "jal ${func}");
-        TEMPLATES.put("CALLR",      "JAL  ${func}\nMOVE ${dst}, $v0");
+        TEMPLATES.put("CALLR",      "jal  ${func}\nmove ${dst}, $v0");
         TEMPLATES.put("RETURN",     "jr   $ra");
         TEMPLATES.put("LABEL",      "${label}:");
-        TEMPLATES.put("ASSIGN",     "lw ${dst}, ${src}");
+        TEMPLATES.put("ASSIGN",     "li ${dst}, ${src}");
     }
 
     public static boolean isNumeric(String str) {
@@ -157,11 +159,6 @@ public class InstructionSelector {
         String op = instr.opCode.name();
         String tpl = TEMPLATES.get(op);
         boolean is_label = false;
-        if (tpl == null) throw new IllegalArgumentException("Unmapped opcode: " + op);
-
-        if (instr.opCode == IRInstruction.OpCode.LABEL) {
-            return List.of(List.of(instr.operands[0].toString()));
-        }
 
         String dst   = "";
         String lhs   = "";
@@ -172,6 +169,24 @@ public class InstructionSelector {
         String src   = "";
         String offset= "";
 
+        if (tpl == null) throw new IllegalArgumentException("Unmapped opcode: " + op);
+
+        if (instr.opCode == IRInstruction.OpCode.LABEL) {
+            createLines(list, tpl, dst, lhs, rhs, instr.operands[0].toString(), func, base, src, offset);
+            return List.of(List.of(instr.operands[0].toString()));
+        }
+        if (instr.opCode == IRInstruction.OpCode.CALLR){
+            func = instr.operands[1].toString();
+            dst  = instr.operands[0].toString();  
+            dst = getRegister(dst, false);
+            if (func.equals("geti")) {
+                createLines(list, "li $v0, 5", "li", "", "", "", "", "", "", "");
+                createLines(list, "syscall", "", "", "", "", "", "", "", "");
+                createLines(list, "move ${dst}, $v0", dst, "", "", "", "", "", "", "");
+                return list;
+            }
+        }
+
         switch (instr.opCode) {
             case MULT:
                 lhs   = instr.operands[1].toString();
@@ -181,15 +196,15 @@ public class InstructionSelector {
                     storeNumeric(list, _tempVirt0, lhs);
                     lhs = _tempVirt0;
                 }else{
-                    lhs = getRegister(lhs);
+                    lhs = getRegister(lhs, false);
                 }
                 if (isNumeric(rhs)){
                     storeNumeric(list, _tempVirt1, lhs);
                     rhs = _tempVirt1;
                 }else{
-                    rhs = getRegister(rhs);
+                    rhs = getRegister(rhs, false);
                 }
-                label = getRegister(label);
+                label = getRegister(label, false);
                 break;
             case ADD: case DIV:
             case AND: case OR: // todo: finish register allocation
@@ -200,47 +215,49 @@ public class InstructionSelector {
                     storeNumeric(list, _tempVirt0, lhs);
                     lhs = _tempVirt0;
                 }else{
-                    lhs = getRegister(lhs);
+                    lhs = getRegister(lhs, false);
                 }
                 if (isNumeric(rhs)){
                     storeNumeric(list, _tempVirt1, lhs);
                     rhs = _tempVirt1;
                 }else{
-                    rhs = getRegister(rhs);
+                    rhs = getRegister(rhs, false);
                 }
-                label = getRegister(label);
+                label = getRegister(label, false);
                 break;
             case SUB:
                 dst = instr.operands[0].toString();
                 lhs = instr.operands[1].toString();
                 rhs = instr.operands[2].toString();
+                lhs = getRegister(lhs, false);
+                rhs = getRegister(rhs, false);
+                dst = getRegister(dst, false);
                 if (isNumeric(lhs) || isNumeric(rhs)){
-                    tpl = "addi ${dst}, ${lhs}, ${rhs}";
+                    // tpl = "addi ${dst}, ${lhs}, -{rhs}";
+                    if (!isNumeric(lhs) && isNumeric(rhs)){
+                        createLines(list, "addi ${dst}, ${lhs}, -{rhs}", dst, lhs, rhs, label, func, base, src, offset);;
+                    }
                     if (isNumeric(lhs) && !isNumeric(rhs)){
-                        String temporary = rhs;
-                        rhs = lhs;
-                        lhs = temporary;
-                        storeNumeric(list, _tempVirt0, rhs);
-                        rhs = _tempVirt0;
+                        createLines(list, "addi ${dst}, ${lhs}, -{rhs}", dst, rhs, lhs, label, func, base, src, offset);
                     }else if (!isNumeric(lhs) && !isNumeric(rhs)){
                         storeNumeric(list, _tempVirt0, rhs);
                         rhs = _tempVirt0;
                         storeNumeric(list, _tempVirt1, lhs);
                         lhs = _tempVirt1;
                     }
-                }else{
-                    lhs = getRegister(lhs);
-                    rhs = getRegister(rhs);
-                    dst = getRegister(dst);
                 }
                 break;
             case ASSIGN:
                 dst = instr.operands[0].toString();
+
                 src = instr.operands[1].toString();
                 if (!isNumeric(src)){
-                    src = getRegister(src);
+                    src = getRegister(src, false);
                 }
-                dst = getRegister(dst);
+                System.out.println(dst);
+                dst = getRegister(dst, false);
+                // System.out.println(dst);
+                // createLines(list, tpl, dst, lhs, rhs, label, func, base, src, offset);
                 break;
             case GOTO:
                 label = instr.operands[0].toString();
@@ -258,6 +275,8 @@ public class InstructionSelector {
                     storeNumeric(list, _tempVirt1, lhs);
                     rhs = _tempVirt1;
                 }
+                lhs = getRegister(lhs, false);
+                rhs = getRegister(rhs, false);
                 break;
             case ARRAY_LOAD:
                 dst    = instr.operands[0].toString();
@@ -269,10 +288,10 @@ public class InstructionSelector {
                     storeNumeric(list, _tempVirt0, offset);
                     offset = _tempVirt0;
                 } else {
-                    offset = getRegister(offset);
+                    offset = getRegister(offset, false);
                 }
-                base = getRegister(base);
-                dst  = getRegister(dst);
+                base = getRegister(base, false);
+                dst  = getRegister(dst, false);
 
                 // sll $t1, offset, 2      # offset (index) * 4 (word size)
                 createLines(list, "sll ${dst}, ${lhs}, 2", _tempVirt1, offset, "", "", "", "", "", "");
@@ -291,10 +310,10 @@ public class InstructionSelector {
                     storeNumeric(list, _tempVirt0, offset);
                     offset = _tempVirt0;
                 } else {
-                    offset = getRegister(offset);
+                    offset = getRegister(offset,    false);
                 }
-                base = getRegister(base);
-                src  = getRegister(src);
+                base = getRegister(base, false);
+                src  = getRegister(src, true);
 
                 // sll $t1, offset, 2      # offset (index) * 4 (word size)
                 createLines(list, "sll ${dst}, ${lhs}, 2", _tempVirt1, offset, "", "", "", "", "", "");
@@ -314,11 +333,11 @@ public class InstructionSelector {
                 dst  = instr.operands[0].toString();
                 break;
             case RETURN:
-                createLines(list, tpl, dst, lhs, rhs, label, func, base, src, offset);
+                createLines(list, "j $ra", dst, lhs, rhs, label, func, base, src, offset);
                 break;
             case LABEL:
-                is_label = true;
                 label = instr.operands[0].toString();
+                is_label = true;
                 break;
             default:
                 throw new IllegalArgumentException("Unsupported opcode: " + op);
@@ -336,7 +355,7 @@ public class InstructionSelector {
                 .replace("${src}",   formatReg(src))
                 .replace("${offset}", offset);
             if (is_label) {
-                filled = filled.replace(":", ""); // remove colon from label
+                filled = new StringBuilder(filled).append(":").toString();
             }else{
                 lines.add("  " + filled);
             }
@@ -345,20 +364,22 @@ public class InstructionSelector {
         return list;
     }
 
-    private String getRegister(String dst) {
-        if (dst.startsWith("$t")) {
+    private String getRegister(String dst, boolean isS) {
+        if (isNumeric(dst)) return dst; // immediates stay numeric
+        if (!isS){
             if (T_registers.get(dst) == null) {
-                T_registers.put(dst, "$t" + registerT_count);
+                T_registers.put(dst, ("$t" + registerT_count));
                 registerT_count++;
             }
             dst = T_registers.get(dst);
-        }
-        if (dst.startsWith("$s")) {
-            if (S_registers.get(dst) == null) {
-                S_registers.put(dst, "$s" + registerS_count);
-                registerS_count++;
+        }else{
+            if (dst.startsWith("$s")) {
+                if (S_registers.get(dst) == null) {
+                    S_registers.put(dst, "$s" + registerS_count);
+                    registerS_count++;
+                }
+                dst = S_registers.get(dst);
             }
-            dst = S_registers.get(dst);
         }
         return dst;
     }
@@ -520,7 +541,7 @@ public class InstructionSelector {
             T_registers_used_by_func.push(new HashSet<>());
             S_registers_used_by_func.push(new HashSet<>());
             registerS_count = 0;
-            registerT_count = 0;
+            registerT_count = 2;
             S_registers.clear();
             T_registers.clear();
 

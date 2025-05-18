@@ -2,35 +2,38 @@
 main:
   move $fp, $sp
   addi $sp, $sp, -432
-  lw $t, 0
-  JAL  geti
-  MOVE $n, $v0
-  addi $temp1, $n, $0
-  bgt  $n, $temp1, return
-  addi $n, $n, 1
-  lw $i, 0
+  li $t2, 0
+  li $v0, 5
+  syscall
+  move $t3, $v0
+  addi $t1, $n, $0
+  bgt  $t3, $t4, return
+  addi $t3, $t3, -{rhs}
+  sub $t3, $t3, 1
+  li $t5, 0
 loop0
-  bgt  $i, $n, exit0
-  JAL  geti
-  MOVE $t, $v0
-  sll $temp1, $i, 2
-  add $temp0, $A, $temp1
-  sw , 0($temp0)
-  addi $temp1, $i, $0
-  add , $i, $temp1
+  bgt  $t5, $t3, exit0
+  li $v0, 5
+  syscall
+  move $t2, $v0
+  sll $t1, $t5, 2
+  add $t0, $t6, $t1
+  sw , 0($t0)
+  addi $t1, $t5, $0
+  add , $t5, $t1
   j    loop0
 exit0
   jal 
-  lw $i, 0
+  li $t5, 0
 loop1
-  bgt  $i, $n, exit1
-  sll $temp1, $i, 2
-  add $temp0, $A, $temp1
-  lw $t, 0($temp0)
+  bgt  $t5, $t3, exit1
+  sll $t1, $t5, 2
+  add $t0, $t6, $t1
+  lw $t2, 0($t0)
   jal 
   jal 
-  addi $temp1, $i, $0
-  add , $i, $temp1
+  addi $t1, $t5, $0
+  add , $t5, $t1
   j    loop1
 exit1
 return
@@ -38,48 +41,50 @@ return
 quicksort:
   move $fp, $sp
   addi $sp, $sp, -864
-  lw $i, 0
-  lw $j, 0
-  bge  $lo, $hi, end
-  add , $lo, $hi
-  addi $temp1, $mid, $0
-  div   $mid, $temp1
-  sll $temp1, $mid, 2
-  add $temp0, $A, $temp1
-  lw $pivot, 0($temp0)
-  addi $i, $lo, 1
-  addi $temp1, $hi, $0
-  add , $hi, $temp1
+  li $t2, 0
+  li $t3, 0
+  bge  $t4, $t5, end
+  add , $t4, $t5
+  addi $t1, $t6, $0
+  div  , $t6, $t1
+  sll $t1, $t6, 2
+  add $t0, $t7, $t1
+  lw $t8, 0($t0)
+  addi $t2, $t4, -{rhs}
+  sub $t2, $t4, 1
+  addi $t1, $t5, $0
+  add , $t5, $t1
 loop0
 loop1
-  addi $temp1, $i, $0
-  add , $i, $temp1
-  sll $temp1, $i, 2
-  add $temp0, $A, $temp1
-  lw $x, 0($temp0)
-  lw $ti, $x
-  blt  $ti, $pivot, loop1
+  addi $t1, $t2, $0
+  add , $t2, $t1
+  sll $t1, $t2, 2
+  add $t0, $t7, $t1
+  lw $t9, 0($t0)
+  li $t10, $t9
+  blt  $t10, $t8, loop1
 loop2
-  addi $j, $j, 1
-  sll $temp1, $j, 2
-  add $temp0, $A, $temp1
-  lw $x, 0($temp0)
-  lw $tj, $x
-  bgt  $tj, $pivot, loop2
-  bge  $i, $j, exit0
-  sll $temp1, $j, 2
-  add $temp0, $A, $temp1
-  sw , 0($temp0)
-  sll $temp1, $i, 2
-  add $temp0, $A, $temp1
-  sw , 0($temp0)
+  addi $t3, $t3, -{rhs}
+  sub $t3, $t3, 1
+  sll $t1, $t3, 2
+  add $t0, $t7, $t1
+  lw $t9, 0($t0)
+  li $t11, $t9
+  bgt  $t11, $t8, loop2
+  bge  $t2, $t3, exit0
+  sll $t1, $t3, 2
+  add $t0, $t7, $t1
+  sw , 0($t0)
+  sll $t1, $t2, 2
+  add $t0, $t7, $t1
+  sw , 0($t0)
   j    loop0
 exit0
-  addi $temp1, $j, $0
-  add , $j, $temp1
+  addi $t1, $t3, $0
+  add , $t3, $t1
   jal 
-  addi $temp1, $j, $0
-  add , $j, $temp1
+  addi $t1, $t3, $0
+  add , $t3, $t1
   jal 
 end
 
