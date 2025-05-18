@@ -41,6 +41,9 @@ return_main:
 quicksort:
   move $fp, $sp
   addi $sp, $sp, -864
+sw $a0, -20($a0)
+sw $a1, -28($a1)
+sw $a2, -24($a2)
   li $t2, 0
   li $t3, 0
   bge  $t4, $t5, end

@@ -26,10 +26,10 @@ public class InstructionSelector {
      *     May need to load/store a memory address from/to index into an array
      *     Can use two registers to calculate the address to read/write from/to
      */
-    // private static String _tempVirt0 = "temp0";
-    // private static String _tempVirt1 = "temp1";
-    private static String _tempVirt0 = "$t0";
-    private static String _tempVirt1 = "$t1";
+    private static String _tempVirt0 = "temp0";
+    private static String _tempVirt1 = "temp1";
+    // private static String _tempVirt0 = "$t0";
+    // private static String _tempVirt1 = "$t1";
     private int pc = 1000;
     private int fp = 1000;
     // private Map<String, List<String>> S_registers_used_by_func = new HashMap<>();
@@ -106,6 +106,8 @@ public class InstructionSelector {
         }
         list.add(lines);
     }
+
+    // private static void 
 
     private static void sw(List<List<String>>list, String dst, String src){
         String tpl = "sw ${dst}, $0, ${src}";
@@ -414,11 +416,11 @@ public class InstructionSelector {
         int i = 0;
 
         // First four arguments are in the $a_ registers
-        for (; i < num_mips_arg_registers; i++) {
+        for (; (i < params.size()) && (i < num_mips_arg_registers); i++) {
             String arg_reg = "$a" + Integer.toString(i);
             String param = params.get(i).getName();
             int param_offset = vRegToOffset.get(param);
-            String move_arg = "sw " + arg_reg + ", " + Integer.toString(param_offset) + "(" + arg_reg + ")";
+            String move_arg = "sw " + arg_reg + ", " + Integer.toString(param_offset) + "($fp)";
             get_args.add(move_arg);
         }
 
@@ -453,9 +455,14 @@ public class InstructionSelector {
 
         // give variables (int-list/float-list) designated spots on the stack
         List<IRVariableOperand> vars = func.variables;
-        for (int i = 0; i < func.variables.size(); i++, offset -= MIPSInstruction.WORD_SIZE) {
+        for (int i = 0; i < func.variables.size(); i++) {
             String v = vars.get(i).getName();
+
+            if (map.containsKey(v))
+                continue;
+
             map.put(v, offset);
+            offset -= MIPSInstruction.WORD_SIZE;
         }
 
         // allocate space for "temp" virt registers (for storing immediate values in branch instructions)
@@ -554,6 +561,12 @@ public class InstructionSelector {
             this.pc += offset;
             mips.add("  move $fp, $sp");
             mips.add("  addi $sp, $sp, -" + offset);
+
+            // Get virtual registers and push arguments into them
+            Map<String, Integer> v_reg_to_off = virtualRegisterToOffset(fn);
+            List<String> arg_loads = loadArguments(fn, v_reg_to_off);
+            mips.addAll(arg_loads);
+
             for (IRInstruction instr : fn.instructions) {
                 List<List<String>> list = selectInstruction(instr);
                 for (List<String> instruction : list){
