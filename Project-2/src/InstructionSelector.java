@@ -40,6 +40,7 @@ public class InstructionSelector {
     private int registerS_count = 0;
     private Map<String, String> S_registers = new HashMap<>();
     private Map<String, String> T_registers = new HashMap<>();
+    private String current_func = "";
 
 
 
@@ -173,7 +174,7 @@ public class InstructionSelector {
 
         if (instr.opCode == IRInstruction.OpCode.LABEL) {
             createLines(list, tpl, dst, lhs, rhs, instr.operands[0].toString(), func, base, src, offset);
-            return List.of(List.of(instr.operands[0].toString()));
+            return List.of(List.of(new StringBuilder(instr.operands[0].toString()).append("_").append(this.current_func).append(":").toString()));
         }
         if (instr.opCode == IRInstruction.OpCode.CALLR){
             func = instr.operands[1].toString();
@@ -542,6 +543,7 @@ public class InstructionSelector {
             S_registers_used_by_func.push(new HashSet<>());
             registerS_count = 0;
             registerT_count = 2;
+            current_func = fn.name;
             S_registers.clear();
             T_registers.clear();
 
