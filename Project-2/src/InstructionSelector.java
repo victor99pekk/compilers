@@ -28,6 +28,12 @@ public class InstructionSelector {
      */
     private static String _tempVirt0 = "temp0";
     private static String _tempVirt1 = "temp1";
+
+    // default MIPS architectural register to use during naive register allocation
+    private static String _default_dest = "$t0";
+    private static String _default_lhs = "$t1";
+    private static String _default_rhs = "$t2";
+
     // private static String _tempVirt0 = "$t0";
     // private static String _tempVirt1 = "$t1";
     private int pc = 1000;
@@ -83,81 +89,136 @@ public class InstructionSelector {
         }
     }
 
-    private static void storeNumeric(List<List<String>>list, String dst, String src){
-        String tpl = "addi ${dst}, ${src}, $0";
-        String lhs   = "";
-        String rhs   = "";
-        String label = "";
-        String func  = "";
-        String base  = "";
-        String offset= "";
-        List<String> lines = new ArrayList<>();
-        for (String line : tpl.split("\\n")) {
-            String filled = line
-                .replace("${dst}",   formatReg(dst))
-                .replace("${lhs}",   formatReg(lhs))
-                .replace("${rhs}",   formatReg(rhs))
-                .replace("${label}", label)
-                .replace("${func}",  func)
-                .replace("${base}",  formatReg(base))
-                .replace("${src}",   formatReg(src))
-                .replace("${offset}", offset);
-            lines.add("  " + filled);
-        }
-        list.add(lines);
+    // private static void storeNumeric(List<List<String>>list, String dst, String src){
+    //     String tpl = "addi ${dst}, ${src}, $0";
+    //     String lhs   = "";
+    //     String rhs   = "";
+    //     String label = "";
+    //     String func  = "";
+    //     String base  = "";
+    //     String offset= "";
+    //     List<String> lines = new ArrayList<>();
+    //     for (String line : tpl.split("\\n")) {
+    //         String filled = line
+    //             .replace("${dst}",   formatReg(dst))
+    //             .replace("${lhs}",   formatReg(lhs))
+    //             .replace("${rhs}",   formatReg(rhs))
+    //             .replace("${label}", label)
+    //             .replace("${func}",  func)
+    //             .replace("${base}",  formatReg(base))
+    //             .replace("${src}",   formatReg(src))
+    //             .replace("${offset}", offset);
+    //         lines.add("  " + filled);
+    //     }
+    //     list.add(lines);
+    // }
+
+    private static void storeVirtualRegister(
+        List<List<String>> list,
+        String archReg,
+        String virtReg,
+        Map<String, Integer> v_reg_to_off)
+    {
+        
+        int offset = v_reg_to_off.get(virtReg);
+        String store = "sw " + archReg + ", " + Integer.toString(offset) + "($fp)";
+        list.add(List.of(store));
     }
 
-    // private static void 
-
-    private static void sw(List<List<String>>list, String dst, String src){
-        String tpl = "sw ${dst}, $0, ${src}";
-        String lhs   = "";
-        String rhs   = "";
-        String label = "";
-        String func  = "";
-        String base  = "";
-        String offset= "";
-        List<String> lines = new ArrayList<>();
-        for (String line : tpl.split("\\n")) {
-            String filled = line
-                .replace("${dst}",   formatReg(dst))
-                .replace("${lhs}",   formatReg(lhs))
-                .replace("${rhs}",   formatReg(rhs))
-                .replace("${label}", label)
-                .replace("${func}",  func)
-                .replace("${base}",  formatReg(base))
-                .replace("${src}",   formatReg(src))
-                .replace("${offset}", offset);
-            lines.add("  " + filled);
-        }
-        list.add(lines);
+    private void loadVirtualRegister(
+        List<List<String>> list,
+        String archReg,
+        String virtReg,
+        Map<String, Integer> v_reg_to_off)
+    {
+        
+        int offset = v_reg_to_off.get(virtReg);
+        String store = "lw " + archReg + ", " + Integer.toString(offset) + "($fp)";
+        list.add(List.of(store));
     }
 
-    private static void addi(List<List<String>>list, String dst, String rhs, String lhs){
-        String tpl = "addi ${dst}, $0, ${src}";
-        String src   = "";
-        String label = "";
-        String func  = "";
-        String base  = "";
-        String offset= "";
-        List<String> lines = new ArrayList<>();
-        for (String line : tpl.split("\\n")) {
-            String filled = line
-                .replace("${dst}",   formatReg(dst))
-                .replace("${lhs}",   formatReg(lhs))
-                .replace("${rhs}",   formatReg(rhs))
-                .replace("${label}", label)
-                .replace("${func}",  func)
-                .replace("${base}",  formatReg(base))
-                .replace("${src}",   formatReg(src))
-                .replace("${offset}", offset);
-            lines.add("  " + filled);
-        }
-        list.add(lines);
+    // private static void sw(List<List<String>>list, String dst, String src){
+    //     String tpl = "sw ${dst}, $0, ${src}";
+    //     String lhs   = "";
+    //     String rhs   = "";
+    //     String label = "";
+    //     String func  = "";
+    //     String base  = "";
+    //     String offset= "";
+    //     List<String> lines = new ArrayList<>();
+    //     for (String line : tpl.split("\\n")) {
+    //         String filled = line
+    //             .replace("${dst}",   formatReg(dst))
+    //             .replace("${lhs}",   formatReg(lhs))
+    //             .replace("${rhs}",   formatReg(rhs))
+    //             .replace("${label}", label)
+    //             .replace("${func}",  func)
+    //             .replace("${base}",  formatReg(base))
+    //             .replace("${src}",   formatReg(src))
+    //             .replace("${offset}", offset);
+    //         lines.add("  " + filled);
+    //     }
+    //     list.add(lines);
+    // }
+
+    // private static void addi(List<List<String>>list, String dst, String rhs, String lhs){
+    //     String tpl = "addi ${dst}, $0, ${src}";
+    //     String src   = "";
+    //     String label = "";
+    //     String func  = "";
+    //     String base  = "";
+    //     String offset= "";
+    //     List<String> lines = new ArrayList<>();
+    //     for (String line : tpl.split("\\n")) {
+    //         String filled = line
+    //             .replace("${dst}",   formatReg(dst))
+    //             .replace("${lhs}",   formatReg(lhs))
+    //             .replace("${rhs}",   formatReg(rhs))
+    //             .replace("${label}", label)
+    //             .replace("${func}",  func)
+    //             .replace("${base}",  formatReg(base))
+    //             .replace("${src}",   formatReg(src))
+    //             .replace("${offset}", offset);
+    //         lines.add("  " + filled);
+    //     }
+    //     list.add(lines);
+    // }
+
+    private void li(List<List<String>>list, String dst, String imm) {
+        String instr = "li " + dst + ", " + imm;
+        list.add(List.of(instr));
     }
 
+    private void arithAndLogicInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
+        String lhs  = instr.operands[1].toString();
+        String rhs  = instr.operands[2].toString();
+        String dst = instr.operands[0].toString();
+        
+        // If operand is immediate, load it into an architectural register and use that register
+        // Otherwise, the operand is a virtual register and must be loaded into a physical register
+        if (isNumeric(lhs)){
+            li(list, _default_lhs, lhs);
+        } else {
+            loadVirtualRegister(list, _default_lhs, lhs, v_reg_to_off);
+        }
+        if (isNumeric(rhs)){
+            li(list, _default_rhs, rhs);
+        } else {
+            loadVirtualRegister(list, _default_rhs, rhs, v_reg_to_off);
+        }
+        
+        // Create mips version of the Tiger IR instruction
+        String op = instr.opCode.toString();
+        String mipsInstr = op + " " + _default_dest + ", " + _default_lhs + ", " + _default_rhs;
+        list.add(List.of(mipsInstr));
 
-    private List<List<String>> selectInstruction(IRInstruction instr) {
+        // Move result into virtual register
+        storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+    }
+
+    private void assignInstr(List<List<String>> s);
+
+    private List<List<String>> selectInstruction(IRInstruction instr, Map<String, Integer> v_reg_to_off) {
         List<List<String>>list = new ArrayList<>();
         String op = instr.opCode.name();
         String tpl = TEMPLATES.get(op);
@@ -191,65 +252,14 @@ public class InstructionSelector {
         }
 
         switch (instr.opCode) {
-            case MULT:
-                lhs   = instr.operands[1].toString();
-                rhs   = instr.operands[2].toString();
-                label = instr.operands[0].toString();
-                if (isNumeric(lhs)){
-                    storeNumeric(list, _tempVirt0, lhs);
-                    lhs = _tempVirt0;
-                }else{
-                    lhs = getRegister(lhs, false);
-                }
-                if (isNumeric(rhs)){
-                    storeNumeric(list, _tempVirt1, lhs);
-                    rhs = _tempVirt1;
-                }else{
-                    rhs = getRegister(rhs, false);
-                }
-                label = getRegister(label, false);
-                break;
-            case ADD: case DIV:
-            case AND: case OR: // todo: finish register allocation
-                lhs   = instr.operands[1].toString();
-                rhs   = instr.operands[2].toString();
-                label = instr.operands[0].toString();
-                if (isNumeric(lhs)){
-                    storeNumeric(list, _tempVirt0, lhs);
-                    lhs = _tempVirt0;
-                }else{
-                    lhs = getRegister(lhs, false);
-                }
-                if (isNumeric(rhs)){
-                    storeNumeric(list, _tempVirt1, lhs);
-                    rhs = _tempVirt1;
-                }else{
-                    rhs = getRegister(rhs, false);
-                }
-                label = getRegister(label, false);
-                break;
+            case ADD:
             case SUB:
-                dst = instr.operands[0].toString();
-                lhs = instr.operands[1].toString();
-                rhs = instr.operands[2].toString();
-                lhs = getRegister(lhs, false);
-                rhs = getRegister(rhs, false);
-                dst = getRegister(dst, false);
-                if (isNumeric(lhs) || isNumeric(rhs)){
-                    // tpl = "addi ${dst}, ${lhs}, -{rhs}";
-                    if (!isNumeric(lhs) && isNumeric(rhs)){
-                        createLines(list, "addi ${dst}, ${lhs}, -{rhs}", dst, lhs, rhs, label, func, base, src, offset);;
-                    }
-                    if (isNumeric(lhs) && !isNumeric(rhs)){
-                        createLines(list, "addi ${dst}, ${lhs}, -{rhs}", dst, rhs, lhs, label, func, base, src, offset);
-                    }else if (!isNumeric(lhs) && !isNumeric(rhs)){
-                        storeNumeric(list, _tempVirt0, rhs);
-                        rhs = _tempVirt0;
-                        storeNumeric(list, _tempVirt1, lhs);
-                        lhs = _tempVirt1;
-                    }
-                }
-                break;
+            case MULT: 
+            case DIV:
+            case AND:
+            case OR:
+                arithAndLogicInstr(list, v_reg_to_off, instr);
+                return list;
             case ASSIGN:
                 dst = instr.operands[0].toString();
 
@@ -568,7 +578,7 @@ public class InstructionSelector {
             mips.addAll(arg_loads);
 
             for (IRInstruction instr : fn.instructions) {
-                List<List<String>> list = selectInstruction(instr);
+                List<List<String>> list = selectInstruction(instr, v_reg_to_off);
                 for (List<String> instruction : list){
                     mips.addAll(instruction);
                 }
