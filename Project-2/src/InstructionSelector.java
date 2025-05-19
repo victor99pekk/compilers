@@ -113,30 +113,6 @@ public class InstructionSelector {
     //     list.add(lines);
     // }
 
-    private static void storeVirtualRegister(
-        List<List<String>> list,
-        String archReg,
-        String virtReg,
-        Map<String, Integer> v_reg_to_off)
-    {
-        
-        int offset = v_reg_to_off.get(virtReg);
-        String store = "sw " + archReg + ", " + Integer.toString(offset) + "($fp)";
-        list.add(List.of(store));
-    }
-
-    private void loadVirtualRegister(
-        List<List<String>> list,
-        String archReg,
-        String virtReg,
-        Map<String, Integer> v_reg_to_off)
-    {
-        
-        int offset = v_reg_to_off.get(virtReg);
-        String store = "lw " + archReg + ", " + Integer.toString(offset) + "($fp)";
-        list.add(List.of(store));
-    }
-
     // private static void sw(List<List<String>>list, String dst, String src){
     //     String tpl = "sw ${dst}, $0, ${src}";
     //     String lhs   = "";
@@ -184,8 +160,34 @@ public class InstructionSelector {
     //     list.add(lines);
     // }
 
+    // Move from architectural register into virtual register
+    private static void storeVirtualRegister(
+        List<List<String>> list,
+        String archReg,
+        String virtReg,
+        Map<String, Integer> v_reg_to_off)
+    {
+        
+        int offset = v_reg_to_off.get(virtReg);
+        String store = "  sw " + archReg + ", " + Integer.toString(offset) + "($fp)";
+        list.add(List.of(store));
+    }
+
+    // Move from virtual register into architectural register
+    private void loadVirtualRegister(
+        List<List<String>> list,
+        String archReg,
+        String virtReg,
+        Map<String, Integer> v_reg_to_off)
+    {
+        
+        int offset = v_reg_to_off.get(virtReg);
+        String store = "  lw " + archReg + ", " + Integer.toString(offset) + "($fp)";
+        list.add(List.of(store));
+    }
+
     private void li(List<List<String>>list, String dst, String imm) {
-        String instr = "li " + dst + ", " + imm;
+        String instr = "  li " + dst + ", " + imm;
         list.add(List.of(instr));
     }
 
@@ -193,6 +195,50 @@ public class InstructionSelector {
         String lhs  = instr.operands[1].toString();
         String rhs  = instr.operands[2].toString();
         String dst = instr.operands[0].toString();
+        
+        // If operand is immediate, load it into an architectural register and use that register
+        // Otherwise, the operand is a virtual register and must be loaded into a physical register
+        if (isNumeric(rhs)){
+            li(list, _default_rhs, rhs);
+        } else {
+            loadVirtualRegister(list, _default_rhs, rhs, v_reg_to_off);
+        }
+
+        loadVirtualRegister(list, _default_lhs, lhs, v_reg_to_off);
+        
+        // Create mips version of the Tiger IR instruction
+        String op = instr.opCode.toString();
+        String mipsInstr = "  " + op + " " + _default_dest + ", " + _default_lhs + ", " + _default_rhs;
+        list.add(List.of(mipsInstr));
+
+        // Move result into virtual register
+        storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+    }
+
+    private void assignInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
+        String dst = instr.operands[0].toString();
+        String src = instr.operands[1].toString();
+        
+        // If operand is immediate, then it's essentially just a load immediate instruction
+        if (isNumeric(src)) {
+            li(list, _default_dest, src);
+            storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+            return;
+        }
+
+        // Otherwise, move between registers
+        loadVirtualRegister(list, _default_lhs, src, v_reg_to_off);
+        String mipsInstr = "  " + "move " + _default_dest + ", " + _default_lhs;
+        list.add(List.of(mipsInstr));
+        storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+    }
+
+    private void branchInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr, String func_name) {
+        String lhs   = instr.operands[1].toString();
+        String rhs   = instr.operands[2].toString();
+        
+        String label = instr.operands[3].toString();
+        String local_label = label + "_" + func_name;
         
         // If operand is immediate, load it into an architectural register and use that register
         // Otherwise, the operand is a virtual register and must be loaded into a physical register
@@ -206,19 +252,13 @@ public class InstructionSelector {
         } else {
             loadVirtualRegister(list, _default_rhs, rhs, v_reg_to_off);
         }
-        
-        // Create mips version of the Tiger IR instruction
-        String op = instr.opCode.toString();
-        String mipsInstr = op + " " + _default_dest + ", " + _default_lhs + ", " + _default_rhs;
-        list.add(List.of(mipsInstr));
 
-        // Move result into virtual register
-        storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+        String op = instr.opCode.toString();
+        String mipsInstr = "  " + op + " " + _default_lhs + ", " + _default_rhs + ", " + local_label;
+        list.add(List.of(mipsInstr));
     }
 
-    private void assignInstr(List<List<String>> s);
-
-    private List<List<String>> selectInstruction(IRInstruction instr, Map<String, Integer> v_reg_to_off) {
+    private List<List<String>> selectInstruction(IRInstruction instr, Map<String, Integer> v_reg_to_off, String func_name) {
         List<List<String>>list = new ArrayList<>();
         String op = instr.opCode.name();
         String tpl = TEMPLATES.get(op);
@@ -235,6 +275,8 @@ public class InstructionSelector {
 
         if (tpl == null) throw new IllegalArgumentException("Unmapped opcode: " + op);
 
+
+        // Special instructions
         if (instr.opCode == IRInstruction.OpCode.LABEL) {
             createLines(list, tpl, dst, lhs, rhs, instr.operands[0].toString(), func, base, src, offset);
             return List.of(List.of(new StringBuilder(instr.operands[0].toString()).append("_").append(this.current_func).append(":").toString()));
@@ -243,116 +285,98 @@ public class InstructionSelector {
             func = instr.operands[1].toString();
             dst  = instr.operands[0].toString();  
             dst = getRegister(dst, false);
+            
             if (func.equals("geti")) {
                 createLines(list, "li $v0, 5", "li", "", "", "", "", "", "", "");
                 createLines(list, "syscall", "", "", "", "", "", "", "", "");
                 createLines(list, "move ${dst}, $v0", dst, "", "", "", "", "", "", "");
                 return list;
             }
+
+            // TODO: getf, getc, puti, putf, putc
+
         }
 
         switch (instr.opCode) {
-            case ADD:
-            case SUB:
-            case MULT: 
-            case DIV:
-            case AND:
-            case OR:
+            case ADD: case SUB: case MULT: case DIV: case AND: case OR:
                 arithAndLogicInstr(list, v_reg_to_off, instr);
                 return list;
             case ASSIGN:
-                dst = instr.operands[0].toString();
-
-                src = instr.operands[1].toString();
-                if (!isNumeric(src)){
-                    src = getRegister(src, false);
-                }
-                System.out.println(dst);
-                dst = getRegister(dst, false);
-                // System.out.println(dst);
-                // createLines(list, tpl, dst, lhs, rhs, label, func, base, src, offset);
-                break;
+                assignInstr(list, v_reg_to_off, instr);
+                return list;
             case GOTO:
                 label = instr.operands[0].toString();
-                break;
+                String local_label = label + "_" + func_name;
+                String mipsInstr = "  " + "j " + local_label;
+                list.add(List.of(mipsInstr));
+                return list;
 
             case BRNEQ: case BRLT: case BRGT: case BRLEQ: case BRGEQ: case BREQ:
-                lhs   = instr.operands[1].toString();
-                rhs   = instr.operands[2].toString();
-                label = instr.operands[0].toString();
-                if (isNumeric(lhs)){
-                    storeNumeric(list, _tempVirt0, lhs);
-                    lhs = _tempVirt0;
-                }
-                if (isNumeric(rhs)){
-                    storeNumeric(list, _tempVirt1, lhs);
-                    rhs = _tempVirt1;
-                }
-                lhs = getRegister(lhs, false);
-                rhs = getRegister(rhs, false);
-                break;
-            case ARRAY_LOAD:
-                dst    = instr.operands[0].toString();
-                base   = instr.operands[1].toString();
-                offset = instr.operands[2].toString();
-
-                // If offset is numeric, store it in a temp register
-                if (isNumeric(offset)) {
-                    storeNumeric(list, _tempVirt0, offset);
-                    offset = _tempVirt0;
-                } else {
-                    offset = getRegister(offset, false);
-                }
-                base = getRegister(base, false);
-                dst  = getRegister(dst, false);
-
-                // sll $t1, offset, 2      # offset (index) * 4 (word size)
-                createLines(list, "sll ${dst}, ${lhs}, 2", _tempVirt1, offset, "", "", "", "", "", "");
-                // add $t2, base, $t1      # address = base + offset*4
-                createLines(list, "add ${dst}, ${lhs}, ${rhs}", _tempVirt0, base, _tempVirt1, "", "", "", "", "");
-                // lw dst, 0($t2)          # load word from address
-                createLines(list, "lw ${dst}, 0(${base})", dst, "", "", "", "", _tempVirt0, "", "");
+                branchInstr(list, v_reg_to_off, instr, func_name);
                 return list;
-                // break;
-            case ARRAY_STORE:
-                src    = instr.operands[0].toString();
-                base   = instr.operands[1].toString();
-                offset = instr.operands[2].toString();
 
-                if (isNumeric(offset)) {
-                    storeNumeric(list, _tempVirt0, offset);
-                    offset = _tempVirt0;
-                } else {
-                    offset = getRegister(offset,    false);
-                }
-                base = getRegister(base, false);
-                src  = getRegister(src, false);
+            // TODO: 
 
-                // sll $t1, offset, 2      # offset (index) * 4 (word size)
-                createLines(list, "sll ${dst}, ${lhs}, 2", _tempVirt1, offset, "", "", "", "", "", "");
-                // add $t2, base, $t1      # address = base + offset*4
-                createLines(list, "add ${dst}, ${lhs}, ${rhs}", _tempVirt0, base, _tempVirt1, "", "", "", "", "");
-                // sw src, 0($t2)          # store word to address
-                // offset = offset;
-                createLines(list, "sw ${src}, {offset}(${base})", src, "", "", "", "", _tempVirt0, "", offset);
-                return list;
-            case CALL:
-                Set<String> used = T_registers_used_by_func.peek();
-                prepareFunctionCall(used);
-                createLines(list, tpl, dst, lhs, rhs, label, func, base, src, offset);
-                restoreFunctionCall(used);
-                return list;
-            case CALLR:
-                func = instr.operands[1].toString();
-                dst  = instr.operands[0].toString();
-                break;
+            // case ARRAY_LOAD:
+            //     dst    = instr.operands[0].toString();
+            //     base   = instr.operands[1].toString();
+            //     offset = instr.operands[2].toString();
+
+            //     // If offset is numeric, store it in a temp register
+            //     if (isNumeric(offset)) {
+            //         storeNumeric(list, _tempVirt0, offset);
+            //         offset = _tempVirt0;
+            //     } else {
+            //         offset = getRegister(offset, false);
+            //     }
+            //     base = getRegister(base, false);
+            //     dst  = getRegister(dst, false);
+
+            //     // sll $t1, offset, 2      # offset (index) * 4 (word size)
+            //     createLines(list, "sll ${dst}, ${lhs}, 2", _tempVirt1, offset, "", "", "", "", "", "");
+            //     // add $t2, base, $t1      # address = base + offset*4
+            //     createLines(list, "add ${dst}, ${lhs}, ${rhs}", _tempVirt0, base, _tempVirt1, "", "", "", "", "");
+            //     // lw dst, 0($t2)          # load word from address
+            //     createLines(list, "lw ${dst}, 0(${base})", dst, "", "", "", "", _tempVirt0, "", "");
+            //     return list;
+            //     // break;
+            // case ARRAY_STORE:
+            //     src    = instr.operands[0].toString();
+            //     base   = instr.operands[1].toString();
+            //     offset = instr.operands[2].toString();
+
+            //     if (isNumeric(offset)) {
+            //         storeNumeric(list, _tempVirt0, offset);
+            //         offset = _tempVirt0;
+            //     } else {
+            //         offset = getRegister(offset,    false);
+            //     }
+            //     base = getRegister(base, false);
+            //     src  = getRegister(src, false);
+
+            //     // sll $t1, offset, 2      # offset (index) * 4 (word size)
+            //     createLines(list, "sll ${dst}, ${lhs}, 2", _tempVirt1, offset, "", "", "", "", "", "");
+            //     // add $t2, base, $t1      # address = base + offset*4
+            //     createLines(list, "add ${dst}, ${lhs}, ${rhs}", _tempVirt0, base, _tempVirt1, "", "", "", "", "");
+            //     // sw src, 0($t2)          # store word to address
+            //     // offset = offset;
+            //     createLines(list, "sw ${src}, {offset}(${base})", src, "", "", "", "", _tempVirt0, "", offset);
+            //     return list;
+            
+            // case CALL:
+            //     Set<String> used = T_registers_used_by_func.peek();
+            //     prepareFunctionCall(used);
+            //     createLines(list, tpl, dst, lhs, rhs, label, func, base, src, offset);
+            //     restoreFunctionCall(used);
+            //     return list;
+            // case CALLR:
+            //     func = instr.operands[1].toString();
+            //     dst  = instr.operands[0].toString();
+            //     break;
             case RETURN:
                 createLines(list, "j $ra", dst, lhs, rhs, label, func, base, src, offset);
                 break;
-            case LABEL:
-                label = instr.operands[0].toString();
-                is_label = true;
-                break;
+
             default:
                 throw new IllegalArgumentException("Unsupported opcode: " + op);
         }
@@ -430,7 +454,8 @@ public class InstructionSelector {
             String arg_reg = "$a" + Integer.toString(i);
             String param = params.get(i).getName();
             int param_offset = vRegToOffset.get(param);
-            String move_arg = "sw " + arg_reg + ", " + Integer.toString(param_offset) + "($fp)";
+            String move_arg = "  sw " + arg_reg + ", " + Integer.toString(param_offset) + "($fp)";
+            
             get_args.add(move_arg);
         }
 
