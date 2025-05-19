@@ -535,7 +535,8 @@ public class InstructionSelector {
 
     private static String formatReg(String name) {
         if (name == null || name.isEmpty()) return "";
-        if (name.matches("\\d+")) return name;  // immediates stay numeric
+        // if (name.matches("\\d+")) return name;  // immediates stay numeric
+        if (isNumeric(name)) return name;
         if (name.startsWith("$")) return name;
         return "$" + name;
     }
