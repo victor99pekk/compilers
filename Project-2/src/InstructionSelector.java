@@ -488,12 +488,8 @@ public class InstructionSelector {
             case ARRAY_STORE:
                 arrayStoreInstr(list, v_reg_to_off, instr);
                 return list;
-            
             case CALL:
-                // Set<String> used = T_registers_used_by_func.peek();
-                // prepareFunctionCall(used);
-                // createLines(list, tpl, dst, lhs, rhs, label, func, base, src, offset);
-                // restoreFunctionCall(used);
+                callInstr(list, v_reg_to_off, instr);
                 return list;
             // case CALLR:
             //     func = instr.operands[1].toString();
