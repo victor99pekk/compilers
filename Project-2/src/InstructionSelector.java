@@ -199,7 +199,11 @@ public class InstructionSelector {
             loadVirtualRegister(list, _default_rhs, rhs, v_reg_to_off);
         }
 
-        loadVirtualRegister(list, _default_lhs, lhs, v_reg_to_off);
+        if (isNumeric(lhs)){
+            li(list, _default_lhs, lhs);
+        } else {
+            loadVirtualRegister(list, _default_lhs, lhs, v_reg_to_off);
+        }
         
         // Create mips version of the Tiger IR instruction
         String op = instr.opCode.toString();
@@ -230,7 +234,7 @@ public class InstructionSelector {
         String lhs   = instr.operands[1].toString();
         String rhs   = instr.operands[2].toString();
         
-        String label = instr.operands[3].toString();
+        String label = instr.operands[0].toString();
         String local_label = label + "_" + func_name;
         
         // If operand is immediate, load it into an architectural register and use that register
@@ -346,22 +350,18 @@ public class InstructionSelector {
             return List.of(List.of(new StringBuilder(instr.operands[0].toString()).append("_").append(this.current_func).append(":").toString()));
         }
         if (instr.opCode == IRInstruction.OpCode.CALLR){
+            func = instr.operands[1].toString();
+            dst  = instr.operands[0].toString();  
             if (func.equals("geti") || func.equals("getf") || func.equals("getc")) {
-                func = instr.operands[1].toString();
-                dst  = instr.operands[0].toString();  
-
                 getSyscalls(list, v_reg_to_off, func, dst);
-
                 return list;
             }
         }
         if (instr.opCode == IRInstruction.OpCode.CALL) {
+            func = instr.operands[0].toString();
+            lhs = instr.operands[1].toString();
             if (func.equals("puti") || func.equals("putf") || func.equals("putc")) {
-                func = instr.operands[0].toString();
-                lhs = instr.operands[1].toString();
-
                 putSyscalls(list, v_reg_to_off, func, lhs);
-
                 return list;
             }
         }
