@@ -284,6 +284,50 @@ public class InstructionSelector {
         storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
     }
 
+    private void saveRegisters(List<List<String>> list, int num_params) {
+        // allocate space for arg registers to be saved
+        createLines(list, "addi $sp, $sp, -16","","","","","","","","");
+        
+        // save arg registers
+        for (int i = 0; i < num_params; i++) {
+            String arg_reg = "$a" + i;
+            String offset = Integer.toString(i * MIPSInstruction.WORD_SIZE);
+            createLines(list, "sw ${src}, ${offset}($sp)","","","","","","",arg_reg,offset);
+        }
+    }
+
+    private void restoreRegisters(List<List<String>> list, int num_params) {
+        // restore arg registers
+        for (int i = 0; i < num_params; i++) {
+            String arg_reg = "$a" + i;
+            String offset = Integer.toString(i * MIPSInstruction.WORD_SIZE);
+            createLines(list, "lw ${dst}, ${offset}($sp)",arg_reg,"","","","","","",offset);
+        }
+        createLines(list, "addi $sp, $sp, 16","","","","","","","","");
+    }
+
+    private void callInstr(List<List<String>> list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
+        String func = instr.operands[0].toString();
+        
+        // save arg registers
+        saveRegisters(list, instr.operands.length - 1);
+
+        // Put values into arg registers
+        for (int i = 1; i < instr.operands.length; i++) {
+            String operand = instr.operands[i].toString();
+            String arg_reg = "$a" + Integer.toString(i - 1);
+
+            if (isNumeric(operand)){ // If offset is numeric, store it in a temp register
+                li(list, arg_reg, operand);createLines(list, "addi $sp, $sp, -16","","","","","","","","");
+            } else {
+                loadVirtualRegister(list, arg_reg, operand, v_reg_to_off);
+            }
+        }
+
+        // call function
+        
+    }
+
     private void arrayStoreInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
         /*
          * Use default lhs register as the offset and default rhs register as the base
@@ -448,12 +492,12 @@ public class InstructionSelector {
                 arrayStoreInstr(list, v_reg_to_off, instr);
                 return list;
             
-            // case CALL:
-            //     Set<String> used = T_registers_used_by_func.peek();
-            //     prepareFunctionCall(used);
-            //     createLines(list, tpl, dst, lhs, rhs, label, func, base, src, offset);
-            //     restoreFunctionCall(used);
-            //     return list;
+            case CALL:
+                // Set<String> used = T_registers_used_by_func.peek();
+                // prepareFunctionCall(used);
+                // createLines(list, tpl, dst, lhs, rhs, label, func, base, src, offset);
+                // restoreFunctionCall(used);
+                return list;
             // case CALLR:
             //     func = instr.operands[1].toString();
             //     dst  = instr.operands[0].toString();
