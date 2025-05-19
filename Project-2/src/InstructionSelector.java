@@ -472,6 +472,7 @@ public class InstructionSelector {
         return "$" + name;
     }
     
+
     /* Returns map from "virtual register" name to offset (below) the frame pointer
      *     "Virtual registers" refer to memory locations on the current function's stack frame
     */
@@ -507,6 +508,7 @@ public class InstructionSelector {
 
         return map;
     }
+
 
     private static int calculateStackAllocation(IRFunction fn) {
         int size = 0;
@@ -603,7 +605,7 @@ public class InstructionSelector {
             mips.addAll(arg_loads);
 
             for (IRInstruction instr : fn.instructions) {
-                List<List<String>> list = selectInstruction(instr, v_reg_to_off);
+                List<List<String>> list = selectInstruction(instr, v_reg_to_off, current_func);
                 for (List<String> instruction : list){
                     mips.addAll(instruction);
                 }
