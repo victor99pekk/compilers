@@ -167,10 +167,8 @@ public class InstructionSelector {
         String virtReg,
         Map<String, Integer> v_reg_to_off)
     {
-        
         int offset = v_reg_to_off.get(virtReg);
-        String store = "  sw " + archReg + ", " + Integer.toString(offset) + "($fp)";
-        list.add(List.of(store));
+        createLines(list, "sw ${src}, ${offset}(${base})","","","","","","$fp", archReg, Integer.toString(offset));
     }
 
     // Move from virtual register into architectural register
@@ -180,15 +178,12 @@ public class InstructionSelector {
         String virtReg,
         Map<String, Integer> v_reg_to_off)
     {
-        
         int offset = v_reg_to_off.get(virtReg);
-        String store = "  lw " + archReg + ", " + Integer.toString(offset) + "($fp)";
-        list.add(List.of(store));
+        createLines(list, "lw ${dst}, ${offset}(${base})", archReg,"","","","","$fp", "", Integer.toString(offset));
     }
 
     private void li(List<List<String>>list, String dst, String imm) {
-        String instr = "  li " + dst + ", " + imm;
-        list.add(List.of(instr));
+        createLines(list, "li ${dst}, ${src}", dst, "", "", "", "", "", imm, "");
     }
 
     private void arithAndLogicInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
@@ -208,8 +203,7 @@ public class InstructionSelector {
         
         // Create mips version of the Tiger IR instruction
         String op = instr.opCode.toString();
-        String mipsInstr = "  " + op + " " + _default_dest + ", " + _default_lhs + ", " + _default_rhs;
-        list.add(List.of(mipsInstr));
+        createLines(list, "${label} ${dst}, ${lhs}, ${rhs}", _default_dest, _default_lhs, _default_rhs, op,"","","","");
 
         // Move result into virtual register
         storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
@@ -228,8 +222,7 @@ public class InstructionSelector {
 
         // Otherwise, move between registers
         loadVirtualRegister(list, _default_lhs, src, v_reg_to_off);
-        String mipsInstr = "  " + "move " + _default_dest + ", " + _default_lhs;
-        list.add(List.of(mipsInstr));
+        createLines(list, "move ${dst}, ${src}", _default_dest, "", "", "", "", "", _default_lhs, "");
         storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
     }
 
@@ -254,8 +247,7 @@ public class InstructionSelector {
         }
 
         String op = instr.opCode.toString();
-        String mipsInstr = "  " + op + " " + _default_lhs + ", " + _default_rhs + ", " + local_label;
-        list.add(List.of(mipsInstr));
+        createLines(list, "${label} ${lhs}, ${rhs}, ${offset}", "", _default_lhs, _default_rhs, op, "", "", "", local_label);
     }
 
     private void getSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, String func, String dst) {
@@ -384,10 +376,8 @@ public class InstructionSelector {
             case GOTO:
                 label = instr.operands[0].toString();
                 String local_label = label + "_" + func_name;
-                String mipsInstr = "  " + "j " + local_label;
-                list.add(List.of(mipsInstr));
+                createLines(list, "j ${label}", "", "", "", local_label, "", "", "", "");
                 return list;
-
             case BRNEQ: case BRLT: case BRGT: case BRLEQ: case BRGEQ: case BREQ:
                 branchInstr(list, v_reg_to_off, instr, func_name);
                 return list;
@@ -452,31 +442,32 @@ public class InstructionSelector {
             //     break;
             case RETURN:
                 createLines(list, "j $ra", dst, lhs, rhs, label, func, base, src, offset);
-                break;
+                // break;
+                return list;
 
             default:
                 throw new IllegalArgumentException("Unsupported opcode: " + op);
         }
 
-        List<String> lines = new ArrayList<>();
-        for (String line : tpl.split("\\n")) {
-            String filled = line
-                .replace("${dst}",   formatReg(dst))
-                .replace("${lhs}",   formatReg(lhs))
-                .replace("${rhs}",   formatReg(rhs))
-                .replace("${label}", label)
-                .replace("${func}",  func)
-                .replace("${base}",  formatReg(base))
-                .replace("${src}",   formatReg(src))
-                .replace("${offset}", offset);
-            if (is_label) {
-                filled = new StringBuilder(filled).append(":").toString();
-            }else{
-                lines.add("  " + filled);
-            }
-        }
-        list.add(lines);
-        return list;
+        // List<String> lines = new ArrayList<>();
+        // for (String line : tpl.split("\\n")) {
+        //     String filled = line
+        //         .replace("${dst}",   formatReg(dst))
+        //         .replace("${lhs}",   formatReg(lhs))
+        //         .replace("${rhs}",   formatReg(rhs))
+        //         .replace("${label}", label)
+        //         .replace("${func}",  func)
+        //         .replace("${base}",  formatReg(base))
+        //         .replace("${src}",   formatReg(src))
+        //         .replace("${offset}", offset);
+        //     if (is_label) {
+        //         filled = new StringBuilder(filled).append(":").toString();
+        //     }else{
+        //         lines.add("  " + filled);
+        //     }
+        // }
+        // list.add(lines);
+        // return list;
     }
 
     private String getRegister(String dst, boolean isS) {
