@@ -8,10 +8,10 @@ main:
   sw $v0, 0($sp)
   li $v0, 6
   syscall
-  sw $f0, -32($fp)
+  sw $v0, -32($fp)
   lw $v0, 0($sp)
   addi $sp, $sp, 4
-  li $t0, $0.000001
+  li.s $f0, 0.000001
   sw $t0, -24($fp)
   lw $t1, -32($fp)
   move $t0, $t1
@@ -19,7 +19,7 @@ main:
   lw $t1, -12($fp)
   move $t0, $t1
   sw $t0, -16($fp)
-  li $t0, $0.
+  li.s $f0, 0.
   sw $t0, -8($fp)
   li $t0, $0.
   sw $t0, -28($fp)

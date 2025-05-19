@@ -266,7 +266,7 @@ public class InstructionSelector {
         else if (func.equals("getf")) {
             createLines(list, "li $v0, 6", "", "", "", "", "", "", "", "");
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
-            storeVirtualRegister(list, "$f0", dst, v_reg_to_off);
+            storeVirtualRegister(list, "$v0", dst, v_reg_to_off);
         }
         else if (func.equals("getc")) {
             createLines(list, "li $v0, 12", "", "", "", "", "", "", "", "");
