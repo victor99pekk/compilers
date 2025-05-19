@@ -278,10 +278,40 @@ public class InstructionSelector {
         // _default_lhs += base    # address = base + offset*4
         createLines(list, "add ${dst}, ${lhs}, ${rhs}", _default_lhs, _default_lhs, _default_rhs, "", "", "", "", "");
 
-        // lw dst, 0($t2)          # load word from address
+        // lw dst, 0($t)          # load word from address
         createLines(list, "lw ${dst}, 0(${base})", _default_dest, "", "", "", "", _default_lhs, "", "");
         // store into virtual register
         storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+    }
+
+    private void arrayStoreInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
+        /*
+         * Use default lhs register as the offset and default rhs register as the base
+         * Use lhs to calculate the address
+         */
+        
+        String dst    = instr.operands[0].toString();
+        String base   = instr.operands[1].toString();
+        String offset = instr.operands[2].toString();
+
+        // _default_lhs = offset
+        if (isNumeric(offset)){ // If offset is numeric, store it in a temp register
+            li(list, _default_lhs, offset);
+        } else {
+            loadVirtualRegister(list, _default_lhs, offset, v_reg_to_off);
+        }
+        // _default_rhs = base
+        loadVirtualRegister(list, _default_rhs, base, v_reg_to_off);
+        // _default_lhs <<= 2
+        createLines(list, "sll ${dst}, ${lhs}, 2", _default_lhs, _default_lhs, "", "", "", "", "", "");
+        // _default_lhs += base    # address = base + offset*4
+        createLines(list, "add ${dst}, ${lhs}, ${rhs}", _default_lhs, _default_lhs, _default_rhs, "", "", "", "", "");
+        // _default_dst = dst
+        loadVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+
+        // sw src, 0($t)          # store word to address
+        // offset = offset;
+        createLines(list, "sw ${src}, 0(${base})", _default_dest, "", "", "", "", _default_lhs, "", "");
     }
 
     private void getSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, String func, String dst) {
@@ -414,28 +444,9 @@ public class InstructionSelector {
             case ARRAY_LOAD:
                 arrayLoadInstr(list, v_reg_to_off, instr);
                 return list;
-            // case ARRAY_STORE:
-            //     src    = instr.operands[0].toString();
-            //     base   = instr.operands[1].toString();
-            //     offset = instr.operands[2].toString();
-
-            //     if (isNumeric(offset)) {
-            //         storeNumeric(list, _tempVirt0, offset);
-            //         offset = _tempVirt0;
-            //     } else {
-            //         offset = getRegister(offset,    false);
-            //     }
-            //     base = getRegister(base, false);
-            //     src  = getRegister(src, false);
-
-            //     // sll $t1, offset, 2      # offset (index) * 4 (word size)
-            //     createLines(list, "sll ${dst}, ${lhs}, 2", _tempVirt1, offset, "", "", "", "", "", "");
-            //     // add $t2, base, $t1      # address = base + offset*4
-            //     createLines(list, "add ${dst}, ${lhs}, ${rhs}", _tempVirt0, base, _tempVirt1, "", "", "", "", "");
-            //     // sw src, 0($t2)          # store word to address
-            //     // offset = offset;
-            //     createLines(list, "sw ${src}, {offset}(${base})", src, "", "", "", "", _tempVirt0, "", offset);
-            //     return list;
+            case ARRAY_STORE:
+                arrayStoreInstr(list, v_reg_to_off, instr);
+                return list;
             
             // case CALL:
             //     Set<String> used = T_registers_used_by_func.peek();
