@@ -258,6 +258,78 @@ public class InstructionSelector {
         list.add(List.of(mipsInstr));
     }
 
+    private void getSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, String func, String dst) {
+        createLines(list,  "addi $sp, $sp, -4", "", "", "", "", "", "", "", "");
+        createLines(list,  "sw $v0, 0($sp)", "", "", "", "", "", "", "", "");
+        
+        if (func.equals("geti")) {
+            createLines(list, "li $v0, 5", "li", "", "", "", "", "", "", "");
+            createLines(list, "syscall", "", "", "", "", "", "", "", "");
+            storeVirtualRegister(list, "$v0", dst, v_reg_to_off);
+        }
+        else if (func.equals("getf")) {
+            createLines(list, "li $v0, 6", "", "", "", "", "", "", "", "");
+            createLines(list, "syscall", "", "", "", "", "", "", "", "");
+            storeVirtualRegister(list, "$f0", dst, v_reg_to_off);
+        }
+        else if (func.equals("getc")) {
+            createLines(list, "li $v0, 12", "", "", "", "", "", "", "", "");
+            createLines(list, "syscall", "", "", "", "", "", "", "", "");
+            storeVirtualRegister(list, "$v0", dst, v_reg_to_off);
+        }
+
+        createLines(list,  "lw $v0, 0($sp)", "", "", "", "", "", "", "", "");
+        createLines(list,  "addi $sp, $sp, 4", "", "", "", "", "", "", "", "");
+    }
+
+    private void putSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, String func, String arg) {
+        createLines(list,  "addi $sp, $sp, -8", "", "", "", "", "", "", "", "");
+        createLines(list,  "sw $v0, 4($sp)", "", "", "", "", "", "", "", "");
+        
+        if (func.equals("puti")) {
+            createLines(list,  "sw $a0, 0($sp)", "", "", "", "", "", "", "", "");
+
+            createLines(list, "li $v0, 1", "", "", "", "", "", "", "", "");
+            if (isNumeric(arg)) {
+                createLines(list, "li $a0, ${src}", "", "", "", "", "", "", arg, "");
+            } else {
+                loadVirtualRegister(list, "$a0", arg, v_reg_to_off);
+            }
+            createLines(list, "syscall", "", "", "", "", "", "", "", "");
+            
+            createLines(list,  "lw $a0, 0($sp)", "", "", "", "", "", "", "", "");
+        }
+        else if (func.equals("putf")) {
+            createLines(list,  "sw $f12, 0($sp)", "", "", "", "", "", "", "", "");
+
+            createLines(list, "li $v0, 2", "", "", "", "", "", "", "", "");
+            if (isNumeric(arg)) {
+                createLines(list, "li $f12, ${src}", "", "", "", "", "", "", arg, "");
+            } else {
+                loadVirtualRegister(list, "$f12", arg, v_reg_to_off);
+            }
+            createLines(list, "syscall", "", "", "", "", "", "", "", "");
+
+            createLines(list,  "lw $f12, 0($sp)", "", "", "", "", "", "", "", "");
+        }
+        else if (func.equals("putc")) {
+            createLines(list,  "sw $a0, 0($sp)", "", "", "", "", "", "", "", "");
+
+            createLines(list, "li $v0, 11", "", "", "", "", "", "", "", "");
+            if (isNumeric(arg)) {
+                createLines(list, "li $a0, ${src}", "", "", "", "", "", "", arg, "");
+            } else {
+                loadVirtualRegister(list, "$a0", arg, v_reg_to_off);
+            }
+            createLines(list, "syscall", "", "", "", "", "", "", "", "");
+            
+            createLines(list,  "lw $a0, 0($sp)", "", "", "", "", "", "", "", "");
+        }
+
+        createLines(list,  "lw $v0, 4($sp)", "", "", "", "", "", "", "", "");
+        createLines(list,  "addi $sp, $sp, 8", "", "", "", "", "", "", "", "");
+    }
+
     private List<List<String>> selectInstruction(IRInstruction instr, Map<String, Integer> v_reg_to_off, String func_name) {
         List<List<String>>list = new ArrayList<>();
         String op = instr.opCode.name();
@@ -282,19 +354,24 @@ public class InstructionSelector {
             return List.of(List.of(new StringBuilder(instr.operands[0].toString()).append("_").append(this.current_func).append(":").toString()));
         }
         if (instr.opCode == IRInstruction.OpCode.CALLR){
-            func = instr.operands[1].toString();
-            dst  = instr.operands[0].toString();  
-            dst = getRegister(dst, false);
-            
-            if (func.equals("geti")) {
-                createLines(list, "li $v0, 5", "li", "", "", "", "", "", "", "");
-                createLines(list, "syscall", "", "", "", "", "", "", "", "");
-                createLines(list, "move ${dst}, $v0", dst, "", "", "", "", "", "", "");
+            if (func.equals("geti") || func.equals("getf") || func.equals("getc")) {
+                func = instr.operands[1].toString();
+                dst  = instr.operands[0].toString();  
+
+                getSyscalls(list, v_reg_to_off, func, dst);
+
                 return list;
             }
+        }
+        if (instr.opCode == IRInstruction.OpCode.CALL) {
+            if (func.equals("puti") || func.equals("putf") || func.equals("putc")) {
+                func = instr.operands[0].toString();
+                lhs = instr.operands[1].toString();
 
-            // TODO: getf, getc, puti, putf, putc
+                putSyscalls(list, v_reg_to_off, func, lhs);
 
+                return list;
+            }
         }
 
         switch (instr.opCode) {
