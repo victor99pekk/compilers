@@ -360,7 +360,7 @@ public class InstructionSelector {
 
         // sw src, 0($t)          # store word to address
         // offset = offset;
-        createLines(list, "sw ${src}, 0(${base})", _default_dest, "", "", "", "", _default_lhs, "", "");
+        createLines(list, "sw ${dst}, 0(${base})", _default_dest, "", "", "", "", _default_lhs, "", "");
     }
 
     // private void saveRegisters(List<List<String>> list, int num_params) {
@@ -587,8 +587,6 @@ public class InstructionSelector {
                 // func = instr.operands[1].toString();
                 // dst  = instr.operands[0].toString();
                 // // use thomas' code to call function -> created callrInstr because is callInstr isn't completely reusable
-                // createLines(list, "move ${dst}, $v0", "", "", "", "", "", "", "", "");
-
                 callrInstr(list, v_reg_to_off, instr);
                 return list;
             case RETURN:
