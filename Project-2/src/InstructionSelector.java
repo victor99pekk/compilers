@@ -714,10 +714,10 @@ public class InstructionSelector {
             if (type instanceof IRArrayType) {
                 int elems = ((IRArrayType) type).getSize();
                 map.put(vars.get(i).getName(), offset);
-                list.add("li $v0, 9");
-                list.add("li $a0, " + elems * MIPSInstruction.WORD_SIZE);
-                list.add("syscall");
-                list.add("sw $v0, " + offset + "($fp)");
+                list.add("  li $v0, 9");
+                list.add("  li $a0, " + elems * MIPSInstruction.WORD_SIZE);
+                list.add("  syscall");
+                list.add("  sw $v0, " + offset + "($fp)");
 
                 offset -= MIPSInstruction.WORD_SIZE;
                 continue;
