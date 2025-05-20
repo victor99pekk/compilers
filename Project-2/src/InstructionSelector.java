@@ -188,6 +188,16 @@ public class InstructionSelector {
         createLines(list, "li ${dst}, ${src}", dst, "", "", "", "", "", imm, "");
     }
 
+    private String arithTigerOpToMipsOp(IRInstruction.OpCode op) {
+        // need to change mult to mul
+        switch (op) {
+            case MULT:
+                return "mul";
+            default:
+                return op.toString();
+        }
+    }
+
     private void arithAndLogicInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
         String lhs  = instr.operands[1].toString();
         String rhs  = instr.operands[2].toString();
@@ -208,7 +218,7 @@ public class InstructionSelector {
         }
         
         // Create mips version of the Tiger IR instruction
-        String op = instr.opCode.toString();
+        String op = arithTigerOpToMipsOp(instr.opCode);
         createLines(list, "${label} ${dst}, ${lhs}, ${rhs}", _default_dest, _default_lhs, _default_rhs, op,"","","","");
 
         // Move result into virtual register
