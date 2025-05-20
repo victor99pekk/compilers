@@ -224,6 +224,91 @@ public class IntraBlockAllocInstructionSelector {
         moveToVirtReg(list, _default_dest, dst, v_reg_to_off, v_reg_to_arch_reg);
     }
 
+    /**
+     * Generate code for “assign, array, size, value”
+     *   -> set every element of the array to the given value.
+     *
+     * Registers used:
+     *   $t0 (_default_dest) : value to store
+     *   $t1 (_default_lhs)  : loop counter i
+     *   $t2 (_default_rhs)  : base address of array
+     *   $t3                 : upper-bound N   (only if N is not immediate)
+     *   $t4                 : scratch – holds effective address base+i*4
+     */
+    private void arrayStoreVal(List<List<String>> list,
+                            Map<String,Integer> v_reg_to_off,
+                            Map<String, String> v_reg_to_arch_reg,
+                            IRInstruction instr)
+    {
+        String array = instr.operands[0].toString();   // destination array
+        String size  = instr.operands[1].toString();   // number of elements
+        String value = instr.operands[2].toString();   // value to write
+
+        // Using t3 and t4, which may already be allocated to specific virtual registers
+        // Need to save them
+        pushRegisters(v_reg_to_arch_reg, v_reg_to_off);
+
+        /* 1.  load base pointer of the array  →  $t2 */
+        // loadVirtualRegister(list, _default_rhs, array, v_reg_to_off);          // $t2 ← base
+        moveToArchReg(list, _default_rhs, array, v_reg_to_off, v_reg_to_arch_reg);
+
+        /* 2.  load / compute the value to be stored → $t0 */
+        if (isNumeric(value))
+            li(list, _default_dest, value);                                     // li  $t0, imm
+        else
+            // loadVirtualRegister(list, _default_dest, value, v_reg_to_off);      // lw  $t0, …
+            moveToArchReg(list, _default_dest, value, v_reg_to_off, v_reg_to_arch_reg);
+
+        /* 3.  counter i ← 0  ( $t1 ) */
+        li(list, _default_lhs, "0");                                        // li  $t1, 0
+
+        /* 4.  prepare loop labels */
+        String loopLbl = "arr_init_loop_" + current_func + "_" + array;
+        String doneLbl = loopLbl + "_done";
+
+        /* loopLbl: */
+        list.add(List.of(loopLbl + ":"));
+
+        /* if (i >= N)  goto doneLbl */
+        if (isNumeric(size)) {
+            li(list, "$t3", size);                                              // t3 ← N
+            createLines(list, "bge ${lhs}, ${rhs}, ${label}",
+                        "", _default_lhs, "$t3", doneLbl, "", "", "", "");
+        } else {
+            // loadVirtualRegister(list, "$t3", size, v_reg_to_off);               // t3 ← N
+            moveToArchReg(list, "$t3", size, v_reg_to_off, v_reg_to_arch_reg);
+            createLines(list, "bge ${lhs}, ${rhs}, ${label}",
+                        "", _default_lhs, "$t3", doneLbl, "", "", "", "");
+        }
+
+        /* addr = base + (i << 2)  (use $t4) */
+        createLines(list, "sll $t4, ${lhs}, 2", "", _default_lhs, "", "", "", "", "", "");
+        createLines(list, "add $t4, $t4, ${rhs}", "", "", _default_rhs, "", "", "", "", "");
+
+        /* store value */
+        createLines(list, "sw ${src}, 0(${base})",
+                    "", "", "", "", "", "$t4", _default_dest, "");
+
+        // loadVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+
+        // // sw src, 0($t)          # store word to address
+        // // offset = offset;
+        // createLines(list, "sw ${dst}, 0(${base})", _default_dest, "", "", "", "", _default_lhs, "", "");
+        /* i += 1 */
+        createLines(list, "addi ${dst}, ${src}, 1",
+                    _default_lhs, _default_lhs, "", "", "", "", "", "");
+
+        /* jump back to loop */
+        createLines(list, "j ${label}", "", "", "", loopLbl, "", "", "", "");
+
+        /* doneLbl: */
+        list.add(List.of(doneLbl + ":"));
+
+
+        // Restore t3 and t4
+        popRegisters(v_reg_to_arch_reg, v_reg_to_off);
+    }
+
 
     private String tigerBranchOpToMipsBranchOps(IRInstruction.OpCode tigerOp) {
         switch (tigerOp) {
@@ -559,7 +644,17 @@ public class IntraBlockAllocInstructionSelector {
                 arithAndLogicInstr(list, v_reg_to_off, v_reg_to_arch_reg, instr);
                 return list;
             case ASSIGN:
-                assignInstr(list, v_reg_to_off, v_reg_to_arch_reg, instr);
+                if (instr.operands.length == 2) {
+                    /* simple x := y  */
+                    assignInstr(list, v_reg_to_off, v_reg_to_arch_reg, instr);
+
+                } else if (instr.operands.length == 3) {
+                    /* array-initialisation  A, N, v  */
+                    arrayStoreVal(list, v_reg_to_off, v_reg_to_arch_reg, instr);
+
+                } else {
+                    createLines(list, "error", dst, lhs, rhs, label, func, base, src, offset);
+                }
                 return list;
             case GOTO:
                 label = instr.operands[0].toString();
