@@ -750,13 +750,13 @@ public class InstructionSelector {
         allVars.addAll(fn.parameters);
         allVars.addAll(fn.variables);
         for (IRVariableOperand var : allVars) {
-            IRType type = var.type;
-            if (type instanceof IRArrayType) {
-                int elems = ((IRArrayType) type).getSize();
-                size += elems * MIPSInstruction.WORD_SIZE;
-            } else {
-                size += MIPSInstruction.WORD_SIZE;
-            }
+            // IRType type = var.type;
+            // if (type instanceof IRArrayType) {
+            //     int elems = ((IRArrayType) type).getSize();
+            //     size += elems * MIPSInstruction.WORD_SIZE;
+            // } else {
+            size += MIPSInstruction.WORD_SIZE;
+            // }
         }
         // space for temporary variables (_tempVirt[0/1])
         size += 2 * MIPSInstruction.WORD_SIZE;
