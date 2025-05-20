@@ -486,7 +486,7 @@ public class InstructionSelector {
         // createLines(list,  "sw $v0, 4($sp)", "", "", "", "", "", "", "", "");
         
         if (func.equals("puti")) {
-            createLines(list,  "sw $a0, 0($sp)", "", "", "", "", "", "", "", "");
+            // createLines(list,  "sw $a0, 0($sp)", "", "", "", "", "", "", "", "");
 
             createLines(list, "li $v0, 1", "", "", "", "", "", "", "", "");
             if (isNumeric(arg)) {
@@ -496,10 +496,10 @@ public class InstructionSelector {
             }
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
             
-            createLines(list,  "lw $a0, 0($sp)", "", "", "", "", "", "", "", "");
+            // createLines(list,  "lw $a0, 0($sp)", "", "", "", "", "", "", "", "");
         }
         else if (func.equals("putf")) {
-            createLines(list,  "sw $f12, 0($sp)", "", "", "", "", "", "", "", "");
+            // createLines(list,  "sw $f12, 0($sp)", "", "", "", "", "", "", "", "");
 
             createLines(list, "li $v0, 2", "", "", "", "", "", "", "", "");
             if (isNumeric(arg)) {
@@ -509,10 +509,10 @@ public class InstructionSelector {
             }
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
 
-            createLines(list,  "lw $f12, 0($sp)", "", "", "", "", "", "", "", "");
+            // createLines(list,  "lw $f12, 0($sp)", "", "", "", "", "", "", "", "");
         }
         else if (func.equals("putc")) {
-            createLines(list,  "sw $a0, 0($sp)", "", "", "", "", "", "", "", "");
+            // createLines(list,  "sw $a0, 0($sp)", "", "", "", "", "", "", "", "");
 
             createLines(list, "li $v0, 11", "", "", "", "", "", "", "", "");
             if (isNumeric(arg)) {
@@ -522,7 +522,7 @@ public class InstructionSelector {
             }
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
             
-            createLines(list,  "lw $a0, 0($sp)", "", "", "", "", "", "", "", "");
+            // createLines(list,  "lw $a0, 0($sp)", "", "", "", "", "", "", "", "");
         }
 
         // createLines(list,  "lw $v0, 4($sp)", "", "", "", "", "", "", "", "");
