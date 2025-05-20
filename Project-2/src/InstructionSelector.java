@@ -852,8 +852,19 @@ public class InstructionSelector {
                     mips.addAll(instruction);
                 }
             }
+            if (fn.name.equals("main")) {
+                mips.add("  li $v0, 10");
+                mips.add("  syscall");
+            }else{
+                // addi $sp, $sp, 104
+                // jr $ra
+                mips.add("  addi $sp, $sp, " + offset);
+                mips.add("  jr $ra");
+            }
             mips.add("");
         }
+
+
         return mips;
     }
 

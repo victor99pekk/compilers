@@ -1,0 +1,1 @@
+spim -file "out.s" < "public_test_cases/quicksort/1.in"

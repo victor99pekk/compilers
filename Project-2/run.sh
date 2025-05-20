@@ -16,4 +16,6 @@
 # Produces out . s
 # ./run.sh public_test_cases/quicksort/quicksort.ir
 
+mkdir -p bin
+javac -d bin $(find . -name "*.java")
 java -cp bin/ Main $1
