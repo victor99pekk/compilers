@@ -12,9 +12,16 @@ public class Main {
         // write a MIPS file
 
         IRProgram prog = new IRReader().parseIRFile(args[0]);
-        InstructionSelector is = new InstructionSelector();
-        List<String> mips = is.instructionSelection(prog);
-        InstructionSelector.writeMipsToFile(mips, "out.s");
-        System.out.println("Generated " + mips.size() + " MIPS lines to out.s");
+        if (args[1].equals("--naive")) {
+            InstructionSelector is = new InstructionSelector();
+            List<String> mips = is.instructionSelection(prog);
+            InstructionSelector.writeMipsToFile(mips, "out.s");
+            System.out.println("Generated " + mips.size() + " MIPS lines to out.s");
+        } else {
+            IntraBlockAllocInstructionSelector is = new IntraBlockAllocInstructionSelector();
+            List<String> mips = is.instructionSelection(prog);
+            IntraBlockAllocInstructionSelector.writeMipsToFile(mips, "out.s");
+            System.out.println("Generated " + mips.size() + " MIPS lines to out.s");
+        }
     }
 }

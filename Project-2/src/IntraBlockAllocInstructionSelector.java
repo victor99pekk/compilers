@@ -1,5 +1,4 @@
 import java.io.IOException;
-import java.lang.foreign.Linker.Option;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -220,7 +219,7 @@ public class IntraBlockAllocInstructionSelector {
         // Otherwise, move between registers
         // loadVirtualRegister(list, _default_lhs, src, v_reg_to_off);
         moveToArchReg(list, _default_dest, src, v_reg_to_off, v_reg_to_arch_reg);
-        createLines(list, "move ${dst}, ${src}", _default_dest, "", "", "", "", "", _default_lhs, "");
+        // createLines(list, "move ${dst}, ${src}", _default_dest, "", "", "", "", "", _default_lhs, "");
         // storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
         moveToVirtReg(list, _default_dest, dst, v_reg_to_off, v_reg_to_arch_reg);
     }
@@ -767,6 +766,28 @@ public class IntraBlockAllocInstructionSelector {
         return basic_blocks;
     }
 
+    private void insertRegPops(int header_idx, List<String> func_instrs, IRInstruction header, List<String> pops) {
+        // if header is a label, load virt regs into allocated regs after the label
+        if (isLabel(header)) {
+            func_instrs.addAll(header_idx + 1, pops);
+        }
+        // else, load allocated regs at beginning of basic block
+        else {
+            func_instrs.addAll(header_idx, pops);
+        }
+    }
+
+    private void insertRegPushes(int tail_idx, List<String> func_instrs, IRInstruction tail, List<String> pushes) {
+        // if last instr in block is a branch, need to push to virt regs before the branch
+        if (isBranch(tail)) {
+            func_instrs.addAll(tail_idx, pushes);
+        }
+        // otherwise, push registers at end of basic block
+        else {
+            assert tail_idx + 1 <= func_instrs.size();
+            func_instrs.addAll(tail_idx + 1, pushes);
+        }
+    }
 
     private List<String> getReadOperands(IRInstruction instr) {
         List<String> ops = new ArrayList<>();
@@ -909,11 +930,12 @@ public class IntraBlockAllocInstructionSelector {
             // translate IR instructions into MIPS
             List<List<IRInstruction>> basic_blocks = getBasicBlocks(fn.instructions);
             for (List<IRInstruction> block : basic_blocks) {
-                
+
+                int idx_of_header_instr = mips.size();
+                IRInstruction header = block.get(0);
+
                 // allocate architectural registers to virtual registers
                 Map<String, String> v_reg_to_arch_reg = virtualRegToArchReg(block);
-                List<String> load_regs = popRegisters(v_reg_to_arch_reg, v_reg_to_off);
-                mips.addAll(load_regs);
                 
                 // translate instructions in block
                 for (IRInstruction instr : block) {
@@ -923,9 +945,16 @@ public class IntraBlockAllocInstructionSelector {
                     }
                 }
 
+                // load virtual registers into allocated architectural registers
+                List<String> load_regs = popRegisters(v_reg_to_arch_reg, v_reg_to_off);
+                insertRegPops(idx_of_header_instr, mips, header, load_regs);
+
+                int idx_of_tail_instr = mips.size() - 1;
+                IRInstruction tail = block.get(block.size() - 1);
+
                 // store new values of virtual registers
                 List<String> store_regs = pushRegisters(v_reg_to_arch_reg, v_reg_to_off);
-                mips.addAll(store_regs);
+                insertRegPushes(idx_of_tail_instr, mips, tail, store_regs);
             }
 
             // epilogue
