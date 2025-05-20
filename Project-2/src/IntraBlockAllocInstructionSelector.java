@@ -288,26 +288,60 @@ public class IntraBlockAllocInstructionSelector {
         createLines(list, "sw ${dst}, 0(${base})", _default_dest, "", "", "", "", _default_lhs, "", "");
     }
 
-    private void saveRegisters(List<List<String>> list, int num_params) {
-        // allocate space for arg registers to be saved
-        createLines(list, "addi $sp, $sp, -16","","","","","","","","");
+    // private void saveRegisters(List<List<String>> list, int num_params) {
+    //     // allocate space for arg registers to be saved
+    //     createLines(list, "addi $sp, $sp, -16","","","","","","","","");
         
-        // save arg registers
-        for (int i = 0; i < num_params; i++) {
-            String arg_reg = "$a" + i;
-            String offset = Integer.toString(i * MIPSInstruction.WORD_SIZE);
-            createLines(list, "sw ${src}, ${offset}($sp)","","","","","","",arg_reg,offset);
+    //     // save arg registers
+    //     for (int i = 0; i < num_params; i++) {
+    //         String arg_reg = "$a" + i;
+    //         String offset = Integer.toString(i * MIPSInstruction.WORD_SIZE);
+    //         createLines(list, "sw ${src}, ${offset}($sp)","","","","","","",arg_reg,offset);
+    //     }
+    // }
+
+    // private void restoreRegisters(List<List<String>> list, int num_params) {
+    //     // restore arg registers
+    //     for (int i = 0; i < num_params; i++) {
+    //         String arg_reg = "$a" + i;
+    //         String offset = Integer.toString(i * MIPSInstruction.WORD_SIZE);
+    //         createLines(list, "lw ${dst}, ${offset}($sp)",arg_reg,"","","","","","",offset);
+    //     }
+    //     createLines(list, "addi $sp, $sp, 16","","","","","","","","");
+    // }
+
+    private List<String> popRegisters(Map<String, String> v_reg_to_arch_reg, Map<String, Integer> v_reg_to_off) {
+        List<String> saves = new ArrayList<>();
+        
+        for (Map.Entry<String, String> virt_arch_pair : v_reg_to_arch_reg.entrySet()) {
+            String v_reg = virt_arch_pair.getKey();
+            int offset = v_reg_to_off.get(v_reg);
+            
+            String a_reg = virt_arch_pair.getValue();
+
+            // lw $<a_reg>, <offset>($fp)
+            String s = "  lw " + a_reg + ", " + offset + "($fp)";
+            saves.add(s);
         }
+
+        return saves;
     }
 
-    private void restoreRegisters(List<List<String>> list, int num_params) {
-        // restore arg registers
-        for (int i = 0; i < num_params; i++) {
-            String arg_reg = "$a" + i;
-            String offset = Integer.toString(i * MIPSInstruction.WORD_SIZE);
-            createLines(list, "lw ${dst}, ${offset}($sp)",arg_reg,"","","","","","",offset);
+    private List<String> pushRegisters(Map<String, String> v_reg_to_arch_reg, Map<String, Integer> v_reg_to_off) {
+        List<String> stores = new ArrayList<>();
+        
+        for (Map.Entry<String, String> virt_arch_pair : v_reg_to_arch_reg.entrySet()) {
+            String v_reg = virt_arch_pair.getKey();
+            int offset = v_reg_to_off.get(v_reg);
+            
+            String a_reg = virt_arch_pair.getValue();
+
+            // sw $<a_reg>, <offset>($fp)
+            String s = "  sw " + a_reg + ", " + offset + "($fp)";
+            stores.add(s);
         }
-        createLines(list, "addi $sp, $sp, 16","","","","","","","","");
+
+        return stores;
     }
 
     private void allocateSpaceOnStack(List<List<String>> list, int size) {
@@ -818,14 +852,23 @@ public class IntraBlockAllocInstructionSelector {
             // translate IR instructions into MIPS
             List<List<IRInstruction>> basic_blocks = getBasicBlocks(fn.instructions);
             for (List<IRInstruction> block : basic_blocks) {
-                Map<String, String> v_reg_to_arch_reg = virtualRegToArchReg(block);
                 
-                for (IRInstruction instr : fn.instructions) {
+                // allocate architectural registers to virtual registers
+                Map<String, String> v_reg_to_arch_reg = virtualRegToArchReg(block);
+                List<String> load_regs = popRegisters(v_reg_to_arch_reg, v_reg_to_off);
+                mips.addAll(load_regs);
+                
+                // translate instructions in block
+                for (IRInstruction instr : block) {
                     List<List<String>> list = selectInstruction(instr, v_reg_to_off, current_func, offset);
                     for (List<String> instruction : list){
                         mips.addAll(instruction);
                     }
                 }
+
+                // store new values of virtual registers
+                List<String> store_regs = pushRegisters(v_reg_to_arch_reg, v_reg_to_off);
+                mips.addAll(store_regs);
             }
 
             // epilogue
