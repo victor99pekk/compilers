@@ -47,6 +47,8 @@ public class InstructionSelector {
     private Map<String, String> S_registers = new HashMap<>();
     private Map<String, String> T_registers = new HashMap<>();
     private String current_func = "";
+    private Map<String, String> func_to_array = new HashMap<>();
+    private Map<String, String> array_to_stack = new HashMap<>();
 
 
 
@@ -662,6 +664,7 @@ public class InstructionSelector {
         return get_args;
     }
 
+
     private static String formatReg(String name) {
         if (name == null || name.isEmpty()) return "";
         // if (name.matches("\\d+")) return name;  // immediates stay numeric
@@ -669,12 +672,11 @@ public class InstructionSelector {
         if (name.startsWith("$")) return name;
         return "$" + name;
     }
-    
 
     /* Returns map from "virtual register" name to offset (below) the frame pointer
      *     "Virtual registers" refer to memory locations on the current function's stack frame
     */
-    private static Map<String, Integer> virtualRegisterToOffset(IRFunction func) {
+    private static Map<String, Integer> virtualRegisterToOffset(IRFunction func, List<String> list) {
         Map<String, Integer> map = new HashMap<>();
 
         int $ra_and_$sp_space = 2 * MIPSInstruction.WORD_SIZE; // always stored at top of stack
@@ -690,6 +692,19 @@ public class InstructionSelector {
         // give variables (int-list/float-list) designated spots on the stack
         List<IRVariableOperand> vars = func.variables;
         for (int i = 0; i < func.variables.size(); i++) {
+            IRType type = vars.get(i).type;
+            if (type instanceof IRArrayType) {
+                int elems = ((IRArrayType) type).getSize();
+                map.put(vars.get(i).getName(), offset);
+                list.add("li $v0, 9");
+                list.add("li $a0, " + elems * MIPSInstruction.WORD_SIZE);
+                list.add("syscall");
+                list.add("sw $v0, " + offset + "($fp)");
+
+                offset -= MIPSInstruction.WORD_SIZE;
+                continue;
+            }
+
             String v = vars.get(i).getName();
 
             if (map.containsKey(v))
@@ -798,7 +813,7 @@ public class InstructionSelector {
             mips.add("  addi $sp, $sp, -" + offset);
 
             // Get virtual registers and push arguments into them
-            Map<String, Integer> v_reg_to_off = virtualRegisterToOffset(fn);
+            Map<String, Integer> v_reg_to_off = virtualRegisterToOffset(fn, mips);
             List<String> arg_loads = loadArguments(fn, v_reg_to_off);
             mips.addAll(arg_loads);
 
