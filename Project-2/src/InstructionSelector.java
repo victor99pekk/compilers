@@ -351,8 +351,18 @@ public class InstructionSelector {
             }
         }
 
+        // save $fp and $ra
+        createLines(list, "addi $sp, $sp, -8","","","","","","","","");
+        createLines(list, "sw $fp, 0($sp)","","","","","","","","");
+        createLines(list, "sw $ra, 4($sp)","","","","","","","","");
+
         // call function
         createLines(list, "jal ${func}", "", "", "", "", func, "", "", "");
+
+        // restore $fp and $ra
+        createLines(list, "lw $fp, 0($sp)","","","","","","","","");
+        createLines(list, "lw $ra, 4($sp)","","","","","","","","");
+        createLines(list, "addi $sp, $sp, 8","","","","","","","","");
     }
 
     private void getSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, String func, String dst) {
@@ -564,7 +574,7 @@ public class InstructionSelector {
     }
 
 
-    private static List<String> loadArguments(IRFunction func, Map<String, Integer> vRegToOffset) {
+    private List<String> loadArguments(IRFunction func, Map<String, Integer> vRegToOffset) {
         List<IRVariableOperand> params = func.parameters;
 
         int num_mips_arg_registers = 4;
@@ -587,6 +597,8 @@ public class InstructionSelector {
 
         return get_args;
     }
+
+    private List<String> allocateArrays(IRFunction func)
 
     private static String formatReg(String name) {
         if (name == null || name.isEmpty()) return "";
