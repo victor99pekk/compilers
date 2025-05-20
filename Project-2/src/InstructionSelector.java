@@ -232,6 +232,26 @@ public class InstructionSelector {
         storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
     }
 
+
+    private String tigerBranchOpToMipsBranchOps(IRInstruction.OpCode tigerOp) {
+        switch (tigerOp) {
+            case BREQ:
+                return "beq";
+            case BRGT:
+                return "bgt";
+            case BRGEQ:
+                return "bge";
+            case BRLEQ:
+                return "ble";
+            case BRLT:
+                return "blt";
+            case BRNEQ:
+                return "bne";
+            default:
+                throw new IllegalArgumentException("Expected a branch op. Instead got " + tigerOp.toString());
+        }
+    }
+
     private void branchInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr, String func_name) {
         String lhs   = instr.operands[1].toString();
         String rhs   = instr.operands[2].toString();
@@ -252,7 +272,7 @@ public class InstructionSelector {
             loadVirtualRegister(list, _default_rhs, rhs, v_reg_to_off);
         }
 
-        String op = instr.opCode.toString();
+        String op = tigerBranchOpToMipsBranchOps(instr.opCode);
         createLines(list, "${label} ${lhs}, ${rhs}, ${offset}", "", _default_lhs, _default_rhs, op, "", "", "", local_label);
     }
 
