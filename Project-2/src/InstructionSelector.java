@@ -431,7 +431,7 @@ public class InstructionSelector {
         // Put values into arg registers
         for (int i = 2; i < instr.operands.length; i++) {
             String operand = instr.operands[i].toString();
-            String arg_reg = "$a" + Integer.toString(i - 1);
+            String arg_reg = "$a" + Integer.toString(i - 2);
 
             if (isNumeric(operand)){ // If offset is numeric, store it in a temp register
                 li(list, arg_reg, operand);
@@ -529,7 +529,7 @@ public class InstructionSelector {
         createLines(list,  "addi $sp, $sp, 8", "", "", "", "", "", "", "", "");
     }
 
-    private List<List<String>> selectInstruction(IRInstruction instr, Map<String, Integer> v_reg_to_off, String func_name) {
+    private List<List<String>> selectInstruction(IRInstruction instr, Map<String, Integer> v_reg_to_off, String func_name, int spOffset) {
         List<List<String>>list = new ArrayList<>();
         String op = instr.opCode.name();
         String tpl = TEMPLATES.get(op);
@@ -600,7 +600,8 @@ public class InstructionSelector {
                 callrInstr(list, v_reg_to_off, instr);
                 return list;
             case RETURN:
-                createLines(list, "j $ra", dst, lhs, rhs, label, func, base, src, offset);
+                createLines(list, "addi $sp, $sp, ${offset}","","","","","","","",Integer.toString(spOffset));
+                createLines(list, "jr $ra", dst, lhs, rhs, label, func, base, src, offset);
                 // break;
                 return list;
 
@@ -846,7 +847,7 @@ public class InstructionSelector {
             mips.addAll(arg_loads);
 
             for (IRInstruction instr : fn.instructions) {
-                List<List<String>> list = selectInstruction(instr, v_reg_to_off, current_func);
+                List<List<String>> list = selectInstruction(instr, v_reg_to_off, current_func, offset);
                 for (List<String> instruction : list){
                     mips.addAll(instruction);
                 }
