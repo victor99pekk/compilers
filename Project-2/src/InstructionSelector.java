@@ -392,6 +392,39 @@ public class InstructionSelector {
         createLines(list, "addi $sp, $sp, 8","","","","","","","","");
     }
 
+    private void callrInstr(List<List<String>> list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
+        String func = instr.operands[1].toString();
+        String ret = instr.operands[0].toString();
+
+        // Put values into arg registers
+        for (int i = 2; i < instr.operands.length; i++) {
+            String operand = instr.operands[i].toString();
+            String arg_reg = "$a" + Integer.toString(i - 1);
+
+            if (isNumeric(operand)){ // If offset is numeric, store it in a temp register
+                li(list, arg_reg, operand);
+            } else {
+                loadVirtualRegister(list, arg_reg, operand, v_reg_to_off);
+            }
+        }
+
+        // save $fp and $ra
+        createLines(list, "addi $sp, $sp, -8","","","","","","","","");
+        createLines(list, "sw $fp, 0($sp)","","","","","","","","");
+        createLines(list, "sw $ra, 4($sp)","","","","","","","","");
+
+        // call function
+        createLines(list, "jal ${func}", "", "", "", "", func, "", "", "");
+
+        // restore $fp and $ra
+        createLines(list, "lw $fp, 0($sp)","","","","","","","","");
+        createLines(list, "lw $ra, 4($sp)","","","","","","","","");
+        createLines(list, "addi $sp, $sp, 8","","","","","","","","");
+
+        // ret = $v0  # store return value in virtual register
+        storeVirtualRegister(list, "$v0", ret, v_reg_to_off);
+    }
+
     private void getSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, String func, String dst) {
         createLines(list,  "addi $sp, $sp, -4", "", "", "", "", "", "", "", "");
         createLines(list,  "sw $v0, 0($sp)", "", "", "", "", "", "", "", "");
@@ -529,10 +562,12 @@ public class InstructionSelector {
                 callInstr(list, v_reg_to_off, instr);
                 return list;
             case CALLR:
-                func = instr.operands[1].toString();
-                dst  = instr.operands[0].toString();
-                // use thomas' code to call function
-                createLines(list, "move ${dst}, $v0", "", "", "", "", "", "", "", "");
+                // func = instr.operands[1].toString();
+                // dst  = instr.operands[0].toString();
+                // // use thomas' code to call function -> created callrInstr because is callInstr isn't completely reusable
+                // createLines(list, "move ${dst}, $v0", "", "", "", "", "", "", "", "");
+
+                callrInstr(list, v_reg_to_off, instr);
                 return list;
             case RETURN:
                 createLines(list, "j $ra", dst, lhs, rhs, label, func, base, src, offset);
@@ -626,8 +661,6 @@ public class InstructionSelector {
 
         return get_args;
     }
-
-    private List<String> allocateArrays(IRFunction func)
 
     private static String formatReg(String name) {
         if (name == null || name.isEmpty()) return "";
