@@ -419,7 +419,7 @@ public class InstructionSelector {
          * Use lhs to calculate the address
          */
         
-        String dst    = instr.operands[0].toString();
+        String src    = instr.operands[0].toString();
         String base   = instr.operands[1].toString();
         String offset = instr.operands[2].toString();
 
@@ -435,8 +435,12 @@ public class InstructionSelector {
         createLines(list, "sll ${dst}, ${lhs}, 2", _default_lhs, _default_lhs, "", "", "", "", "", "");
         // _default_lhs += base    # address = base + offset*4
         createLines(list, "add ${dst}, ${lhs}, ${rhs}", _default_lhs, _default_lhs, _default_rhs, "", "", "", "", "");
-        // _default_dst = dst
-        loadVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+        // _default_dst = src (using _default_dest, for lack of a better name)
+        if (isNumeric(src)) {
+            li(list, _default_dest, src);
+        } else {
+            loadVirtualRegister(list, _default_dest, src, v_reg_to_off);
+        }
 
         // sw src, 0($t)          # store word to address
         // offset = offset;
