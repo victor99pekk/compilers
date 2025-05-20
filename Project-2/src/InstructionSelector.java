@@ -600,9 +600,14 @@ public class InstructionSelector {
                 callrInstr(list, v_reg_to_off, instr);
                 return list;
             case RETURN:
+                String retval = instr.operands[0].toString();
+                if (isNumeric(retval)){ // If offset is numeric, store it in a temp register
+                    li(list, "$v0", retval);
+                } else {
+                    loadVirtualRegister(list, "$v0", retval, v_reg_to_off);
+                }
                 createLines(list, "addi $sp, $sp, ${offset}","","","","","","","",Integer.toString(spOffset));
                 createLines(list, "jr $ra", dst, lhs, rhs, label, func, base, src, offset);
-                // break;
                 return list;
 
             default:
