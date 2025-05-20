@@ -726,6 +726,7 @@ public class IntraBlockAllocInstructionSelector {
             case BRGT:
             case BRLEQ:
             case BRGEQ:
+            case GOTO:
                 return true;
             default:
                 return false;
