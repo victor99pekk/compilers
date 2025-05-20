@@ -343,6 +343,76 @@ public class InstructionSelector {
         createLines(list, "addi $sp, $sp, 16","","","","","","","","");
     }
 
+
+        /**
+     * Generate code for “assign, array, size, value”
+     *   -> set every element of the array to the given value.
+     *
+     * Registers used:
+     *   $t0 (_default_dest) : value to store
+     *   $t1 (_default_lhs)  : loop counter i
+     *   $t2 (_default_rhs)  : base address of array
+     *   $t3                 : upper-bound N   (only if N is not immediate)
+     *   $t4                 : scratch – holds effective address base+i*4
+     */
+    private void arrayStoreVal(List<List<String>> list,
+                            Map<String,Integer> v_reg_to_off,
+                            IRInstruction instr)
+    {
+        String array = instr.operands[0].toString();   // destination array
+        String size  = instr.operands[1].toString();   // number of elements
+        String value = instr.operands[2].toString();   // value to write
+
+        /* 1.  load base pointer of the array  →  $t2 */
+        loadVirtualRegister(list, _default_rhs, array, v_reg_to_off);          // $t2 ← base
+
+        /* 2.  load / compute the value to be stored → $t0 */
+        if (isNumeric(value))
+            li(list, _default_dest, value);                                     // li  $t0, imm
+        else
+            loadVirtualRegister(list, _default_dest, value, v_reg_to_off);      // lw  $t0, …
+
+        /* 3.  counter i ← 0  ( $t1 ) */
+        li(list, _default_lhs, "0");                                            // li  $t1, 0
+
+        /* 4.  prepare loop labels */
+        String loopLbl = "arr_init_loop_" + current_func + "_" + array;
+        String doneLbl = loopLbl + "_done";
+
+        /* loopLbl: */
+        list.add(List.of(loopLbl + ":"));
+
+        /* if (i >= N)  goto doneLbl */
+        if (isNumeric(size)) {
+            li(list, "$t3", size);                                              // t3 ← N
+            createLines(list, "bge ${lhs}, ${rhs}, ${label}",
+                        "", _default_lhs, "$t3", doneLbl, "", "", "", "");
+        } else {
+            loadVirtualRegister(list, "$t3", size, v_reg_to_off);               // t3 ← N
+            createLines(list, "bge ${lhs}, ${rhs}, ${label}",
+                        "", _default_lhs, "$t3", doneLbl, "", "", "", "");
+        }
+
+        /* addr = base + (i << 2)  (use $t4) */
+        createLines(list, "sll $t4, ${lhs}, 2", "", _default_lhs, "", "", "", "", "", "");
+        createLines(list, "add $t4, $t4, ${rhs}", "", "", _default_rhs, "", "", "", "", "");
+
+        /* store value */
+        createLines(list, "sw ${src}, 0(${base})",
+                    "", "", "", "", "", "$t4", _default_dest, "");
+
+        /* i += 1 */
+        createLines(list, "addi ${dst}, ${src}, 1",
+                    _default_lhs, _default_lhs, "", "", "", "", "", "");
+
+        /* jump back to loop */
+        createLines(list, "j ${label}", "", "", "", loopLbl, "", "", "", "");
+
+        /* doneLbl: */
+        list.add(List.of(doneLbl + ":"));
+    }
+
+
     private void arrayStoreInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
         /*
          * Use default lhs register as the offset and default rhs register as the base
@@ -574,7 +644,19 @@ public class InstructionSelector {
                 arithAndLogicInstr(list, v_reg_to_off, instr);
                 return list;
             case ASSIGN:
-                assignInstr(list, v_reg_to_off, instr);
+                if (instr.operands.length == 2) {
+                    /* simple x := y  */
+                    assignInstr(list, v_reg_to_off, instr);
+
+                } else if (instr.operands.length == 3) {
+                    /* array-initialisation  A, N, v  */
+                    arrayStoreVal(list, v_reg_to_off, instr);
+
+                }/*  else {
+                    throw new IRException(
+                        "ASSIGN expects 2 (scalar) or 3 (array) operands, got "
+                        + instr.operands.length);
+                } */
                 return list;
             case GOTO:
                 label = instr.operands[0].toString();
