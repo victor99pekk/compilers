@@ -10,7 +10,7 @@ run: all
 
 	# ./run.sh 
 
-test: all
+test: run
 	./run_test.sh
 
 clean:

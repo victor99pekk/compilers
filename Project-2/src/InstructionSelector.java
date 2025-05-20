@@ -776,7 +776,7 @@ public class InstructionSelector {
         int align = 2 * MIPSInstruction.WORD_SIZE;
         int rem = size % align;
         if (rem != 0) size += align - rem;
-        return size;
+        return size * 4;
     }
 
     // private void prepareFunctionCall(IRFunction fn) {
@@ -836,8 +836,8 @@ public class InstructionSelector {
 
             mips.add(fn.name + ":");
             int offset = calculateStackAllocation(fn);
-            this.fp = this.pc;
-            this.pc += offset;
+            // this.fp = this.pc;
+            // this.pc += offset;
             mips.add("  move $fp, $sp");
             mips.add("  addi $sp, $sp, -" + offset);
 
