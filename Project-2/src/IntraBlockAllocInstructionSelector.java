@@ -104,8 +104,8 @@ public class IntraBlockAllocInstructionSelector {
         }
     }
 
-    // Move from architectural register into virtual register
-    private static void storeVirtualRegister(
+    // store from architectural register into virtual register
+    private void storeVirtualRegister(
         List<List<String>> list,
         String archReg,
         String virtReg,
@@ -115,7 +115,7 @@ public class IntraBlockAllocInstructionSelector {
         createLines(list, "sw ${src}, ${offset}(${base})","","","","","","$fp", archReg, Integer.toString(offset));
     }
 
-    // Move from virtual register into architectural register
+    // load from virtual register into architectural register
     private void loadVirtualRegister(
         List<List<String>> list,
         String archReg,
@@ -124,6 +124,41 @@ public class IntraBlockAllocInstructionSelector {
     {
         int offset = v_reg_to_off.get(virtReg);
         createLines(list, "lw ${dst}, ${offset}(${base})", archReg,"","","","","$fp", "", Integer.toString(offset));
+    }
+
+
+    // Move from architectural register to virtual register
+    // If virtual register has an allocated architectural register, use that register
+    private void moveToVirtReg(
+        List<List<String>> list,
+        String archReg,
+        String virtReg,
+        Map<String, Integer> v_reg_to_off,
+        Map<String, String> v_reg_to_arch_reg)
+    {
+        if (v_reg_to_arch_reg.containsKey(virtReg)) {
+            String dst_reg = v_reg_to_arch_reg.get(virtReg);
+            createLines(list, "move ${dst}, ${src}", dst_reg, "", "", "", "", "", archReg, "");
+        } else {
+            storeVirtualRegister(list, archReg, virtReg, v_reg_to_off);
+        }
+    }
+
+    // Move from virtual register to architectural register
+    // If virtual register has an allocated architectural register, use that register
+    private void moveToArchReg(
+        List<List<String>> list,
+        String archReg,
+        String virtReg,
+        Map<String, Integer> v_reg_to_off,
+        Map<String, String> v_reg_to_arch_reg)
+    {
+        if (v_reg_to_arch_reg.containsKey(virtReg)) {
+            String src_reg = v_reg_to_arch_reg.get(virtReg);
+            createLines(list, "move ${dst}, ${src}", archReg, "", "", "", "", "", src_reg, "");
+        } else {
+            loadVirtualRegister(list, archReg, virtReg, v_reg_to_off);
+        }
     }
 
     private void li(List<List<String>>list, String dst, String imm) {
@@ -140,7 +175,7 @@ public class IntraBlockAllocInstructionSelector {
         }
     }
 
-    private void arithAndLogicInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
+    private void arithAndLogicInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, Map<String, String> v_reg_to_arch_reg, IRInstruction instr) {
         String lhs  = instr.operands[1].toString();
         String rhs  = instr.operands[2].toString();
         String dst = instr.operands[0].toString();
@@ -150,13 +185,15 @@ public class IntraBlockAllocInstructionSelector {
         if (isNumeric(rhs)){
             li(list, _default_rhs, rhs);
         } else {
-            loadVirtualRegister(list, _default_rhs, rhs, v_reg_to_off);
+            // loadVirtualRegister(list, _default_rhs, rhs, v_reg_to_off);
+            moveToArchReg(list, _default_rhs, rhs, v_reg_to_off, v_reg_to_arch_reg);
         }
 
         if (isNumeric(lhs)){
             li(list, _default_lhs, lhs);
         } else {
-            loadVirtualRegister(list, _default_lhs, lhs, v_reg_to_off);
+            // loadVirtualRegister(list, _default_lhs, lhs, v_reg_to_off);
+            moveToArchReg(list, _default_lhs, lhs, v_reg_to_off, v_reg_to_arch_reg);
         }
         
         // Create mips version of the Tiger IR instruction
@@ -164,24 +201,28 @@ public class IntraBlockAllocInstructionSelector {
         createLines(list, "${label} ${dst}, ${lhs}, ${rhs}", _default_dest, _default_lhs, _default_rhs, op,"","","","");
 
         // Move result into virtual register
-        storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+        // storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+        moveToVirtReg(list, _default_dest, dst, v_reg_to_off, v_reg_to_arch_reg);
     }
 
-    private void assignInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
+    private void assignInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, Map<String, String> v_reg_to_arch_reg, IRInstruction instr) {
         String dst = instr.operands[0].toString();
         String src = instr.operands[1].toString();
         
         // If operand is immediate, then it's essentially just a load immediate instruction
         if (isNumeric(src)) {
             li(list, _default_dest, src);
-            storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+            // storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+            moveToVirtReg(list, _default_dest, dst, v_reg_to_off, v_reg_to_arch_reg);
             return;
         }
 
         // Otherwise, move between registers
-        loadVirtualRegister(list, _default_lhs, src, v_reg_to_off);
+        // loadVirtualRegister(list, _default_lhs, src, v_reg_to_off);
+        moveToArchReg(list, _default_dest, src, v_reg_to_off, v_reg_to_arch_reg);
         createLines(list, "move ${dst}, ${src}", _default_dest, "", "", "", "", "", _default_lhs, "");
-        storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+        // storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+        moveToVirtReg(list, _default_dest, dst, v_reg_to_off, v_reg_to_arch_reg);
     }
 
 
@@ -204,7 +245,7 @@ public class IntraBlockAllocInstructionSelector {
         }
     }
 
-    private void branchInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr, String func_name) {
+    private void branchInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, Map<String, String> v_reg_to_arch_reg, IRInstruction instr, String func_name) {
         String lhs   = instr.operands[1].toString();
         String rhs   = instr.operands[2].toString();
         
@@ -216,19 +257,21 @@ public class IntraBlockAllocInstructionSelector {
         if (isNumeric(lhs)){
             li(list, _default_lhs, lhs);
         } else {
-            loadVirtualRegister(list, _default_lhs, lhs, v_reg_to_off);
+            // loadVirtualRegister(list, _default_lhs, lhs, v_reg_to_off);
+            moveToArchReg(list, _default_lhs, lhs, v_reg_to_off, v_reg_to_arch_reg);
         }
         if (isNumeric(rhs)){
             li(list, _default_rhs, rhs);
         } else {
-            loadVirtualRegister(list, _default_rhs, rhs, v_reg_to_off);
+            // loadVirtualRegister(list, _default_rhs, rhs, v_reg_to_off);
+            moveToArchReg(list, _default_rhs, rhs, v_reg_to_off, v_reg_to_arch_reg);
         }
 
         String op = tigerBranchOpToMipsBranchOps(instr.opCode);
         createLines(list, "${label} ${lhs}, ${rhs}, ${offset}", "", _default_lhs, _default_rhs, op, "", "", "", local_label);
     }
 
-    private void arrayLoadInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
+    private void arrayLoadInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, Map<String, String> v_reg_to_arch_reg, IRInstruction instr) {
         /*
          * Use default lhs register as the offset and default rhs register as the base
          * Use lhs to calculate the address.
@@ -243,10 +286,12 @@ public class IntraBlockAllocInstructionSelector {
         if (isNumeric(offset)){ // If offset is numeric, store it in a temp register
             li(list, _default_lhs, offset);
         } else {
-            loadVirtualRegister(list, _default_lhs, offset, v_reg_to_off);
+            // loadVirtualRegister(list, _default_lhs, offset, v_reg_to_off);
+            moveToArchReg(list, _default_lhs, offset, v_reg_to_off, v_reg_to_arch_reg);
         }
         // _default_rhs = base
-        loadVirtualRegister(list, _default_rhs, base, v_reg_to_off);
+        // loadVirtualRegister(list, _default_rhs, base, v_reg_to_off);
+        moveToArchReg(list, _default_rhs, base, v_reg_to_off, v_reg_to_arch_reg);
         // _default_lhs <<= 2
         createLines(list, "sll ${dst}, ${lhs}, 2", _default_lhs, _default_lhs, "", "", "", "", "", "");
         // _default_lhs += base    # address = base + offset*4
@@ -255,10 +300,11 @@ public class IntraBlockAllocInstructionSelector {
         // lw dst, 0($t)          # load word from address
         createLines(list, "lw ${dst}, 0(${base})", _default_dest, "", "", "", "", _default_lhs, "", "");
         // store into virtual register
-        storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+        // storeVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+        moveToVirtReg(list, _default_dest, dst, v_reg_to_off, v_reg_to_arch_reg);
     }
 
-    private void arrayStoreInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
+    private void arrayStoreInstr(List<List<String>>list, Map<String, Integer> v_reg_to_off, Map<String, String> v_reg_to_arch_reg, IRInstruction instr) {
         /*
          * Use default lhs register as the offset and default rhs register as the base
          * Use lhs to calculate the address
@@ -272,43 +318,24 @@ public class IntraBlockAllocInstructionSelector {
         if (isNumeric(offset)){ // If offset is numeric, store it in a temp register
             li(list, _default_lhs, offset);
         } else {
-            loadVirtualRegister(list, _default_lhs, offset, v_reg_to_off);
+            // loadVirtualRegister(list, _default_lhs, offset, v_reg_to_off);
+            moveToArchReg(list, _default_lhs, offset, v_reg_to_off, v_reg_to_arch_reg);
         }
         // _default_rhs = base
-        loadVirtualRegister(list, _default_rhs, base, v_reg_to_off);
+        // loadVirtualRegister(list, _default_rhs, base, v_reg_to_off);
+        moveToArchReg(list, _default_rhs, base, v_reg_to_off, v_reg_to_arch_reg);
         // _default_lhs <<= 2
         createLines(list, "sll ${dst}, ${lhs}, 2", _default_lhs, _default_lhs, "", "", "", "", "", "");
         // _default_lhs += base    # address = base + offset*4
         createLines(list, "add ${dst}, ${lhs}, ${rhs}", _default_lhs, _default_lhs, _default_rhs, "", "", "", "", "");
         // _default_dst = dst
-        loadVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+        // loadVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+        moveToArchReg(list, _default_dest, dst, v_reg_to_off, v_reg_to_arch_reg);
 
         // sw src, 0($t)          # store word to address
         // offset = offset;
         createLines(list, "sw ${dst}, 0(${base})", _default_dest, "", "", "", "", _default_lhs, "", "");
     }
-
-    // private void saveRegisters(List<List<String>> list, int num_params) {
-    //     // allocate space for arg registers to be saved
-    //     createLines(list, "addi $sp, $sp, -16","","","","","","","","");
-        
-    //     // save arg registers
-    //     for (int i = 0; i < num_params; i++) {
-    //         String arg_reg = "$a" + i;
-    //         String offset = Integer.toString(i * MIPSInstruction.WORD_SIZE);
-    //         createLines(list, "sw ${src}, ${offset}($sp)","","","","","","",arg_reg,offset);
-    //     }
-    // }
-
-    // private void restoreRegisters(List<List<String>> list, int num_params) {
-    //     // restore arg registers
-    //     for (int i = 0; i < num_params; i++) {
-    //         String arg_reg = "$a" + i;
-    //         String offset = Integer.toString(i * MIPSInstruction.WORD_SIZE);
-    //         createLines(list, "lw ${dst}, ${offset}($sp)",arg_reg,"","","","","","",offset);
-    //     }
-    //     createLines(list, "addi $sp, $sp, 16","","","","","","","","");
-    // }
 
     private List<String> popRegisters(Map<String, String> v_reg_to_arch_reg, Map<String, Integer> v_reg_to_off) {
         List<String> saves = new ArrayList<>();
@@ -349,7 +376,7 @@ public class IntraBlockAllocInstructionSelector {
         createLines(list, "addi $sp, $sp, -{size}","","","","","","","","");
     }
 
-    private void callInstr(List<List<String>> list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
+    private void callInstr(List<List<String>> list, Map<String, Integer> v_reg_to_off, Map<String, String> v_reg_to_arch_reg, IRInstruction instr) {
         String func = instr.operands[0].toString();
 
         // Put values into arg registers
@@ -360,9 +387,14 @@ public class IntraBlockAllocInstructionSelector {
             if (isNumeric(operand)){ // If offset is numeric, store it in a temp register
                 li(list, arg_reg, operand);
             } else {
-                loadVirtualRegister(list, arg_reg, operand, v_reg_to_off);
+                // loadVirtualRegister(list, arg_reg, operand, v_reg_to_off);
+                moveToArchReg(list, arg_reg, operand, v_reg_to_off, v_reg_to_arch_reg);
             }
         }
+
+        // save temp registers
+        List<String> pushes = pushRegisters(v_reg_to_arch_reg, v_reg_to_off);
+        list.add(pushes);
 
         // save $fp and $ra
         createLines(list, "addi $sp, $sp, -8","","","","","","","","");
@@ -376,9 +408,13 @@ public class IntraBlockAllocInstructionSelector {
         createLines(list, "lw $fp, 0($sp)","","","","","","","","");
         createLines(list, "lw $ra, 4($sp)","","","","","","","","");
         createLines(list, "addi $sp, $sp, 8","","","","","","","","");
+
+        // restore temp registers
+        List<String> pops = popRegisters(v_reg_to_arch_reg, v_reg_to_off);
+        list.add(pops);
     }
 
-    private void callrInstr(List<List<String>> list, Map<String, Integer> v_reg_to_off, IRInstruction instr) {
+    private void callrInstr(List<List<String>> list, Map<String, Integer> v_reg_to_off, Map<String, String> v_reg_to_arch_reg, IRInstruction instr) {
         String func = instr.operands[1].toString();
         String ret = instr.operands[0].toString();
 
@@ -390,9 +426,14 @@ public class IntraBlockAllocInstructionSelector {
             if (isNumeric(operand)){ // If offset is numeric, store it in a temp register
                 li(list, arg_reg, operand);
             } else {
-                loadVirtualRegister(list, arg_reg, operand, v_reg_to_off);
+                // loadVirtualRegister(list, arg_reg, operand, v_reg_to_off);
+                moveToArchReg(list, arg_reg, operand, v_reg_to_off, v_reg_to_arch_reg);
             }
         }
+
+        // save temp registers
+        List<String> pushes = pushRegisters(v_reg_to_arch_reg, v_reg_to_off);
+        list.add(pushes);
 
         // save $fp and $ra
         createLines(list, "addi $sp, $sp, -8","","","","","","","","");
@@ -407,11 +448,16 @@ public class IntraBlockAllocInstructionSelector {
         createLines(list, "lw $ra, 4($sp)","","","","","","","","");
         createLines(list, "addi $sp, $sp, 8","","","","","","","","");
 
+        // restore temp registers
+        List<String> pops = popRegisters(v_reg_to_arch_reg, v_reg_to_off);
+        list.add(pops);
+
         // ret = $v0  # store return value in virtual register
-        storeVirtualRegister(list, "$v0", ret, v_reg_to_off);
+        // storeVirtualRegister(list, "$v0", ret, v_reg_to_off);
+        moveToVirtReg(list, "$v0", ret, v_reg_to_off, v_reg_to_arch_reg);
     }
 
-    private void getSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, String func, String dst) {
+    private void getSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, Map<String, String> v_reg_to_arch_reg, String func, String dst) {
         if (func.equals("geti")) {
             createLines(list, "li $v0, 5", "li", "", "", "", "", "", "", "");
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
@@ -426,16 +472,16 @@ public class IntraBlockAllocInstructionSelector {
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
         }
 
-        storeVirtualRegister(list, "$v0", dst, v_reg_to_off);
+        moveToVirtReg(list, "$v0", dst, v_reg_to_off, v_reg_to_arch_reg);
     }
 
-    private void putSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, String func, String arg) {
+    private void putSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, Map<String, String> v_reg_to_arch_reg, String func, String arg) {
         if (func.equals("puti")) {
             createLines(list, "li $v0, 1", "", "", "", "", "", "", "", "");
             if (isNumeric(arg)) {
                 createLines(list, "li $a0, ${src}", "", "", "", "", "", "", arg, "");
             } else {
-                loadVirtualRegister(list, "$a0", arg, v_reg_to_off);
+                moveToArchReg(list, "$a0", arg, v_reg_to_off, v_reg_to_arch_reg);
             }
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
         }
@@ -444,7 +490,7 @@ public class IntraBlockAllocInstructionSelector {
             if (isNumeric(arg)) {
                 createLines(list, "li $f12, ${src}", "", "", "", "", "", "", arg, "");
             } else {
-                loadVirtualRegister(list, "$f12", arg, v_reg_to_off);
+                moveToArchReg(list, "$f12", arg, v_reg_to_off, v_reg_to_arch_reg);
             }
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
         }
@@ -453,17 +499,23 @@ public class IntraBlockAllocInstructionSelector {
             if (isNumeric(arg)) {
                 createLines(list, "li $a0, ${src}", "", "", "", "", "", "", arg, "");
             } else {
-                loadVirtualRegister(list, "$a0", arg, v_reg_to_off);
+                moveToArchReg(list, "$a0", arg, v_reg_to_off, v_reg_to_arch_reg);
             }
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
         }
     }
 
-    private List<List<String>> selectInstruction(IRInstruction instr, Map<String, Integer> v_reg_to_off, String func_name, int spOffset) {
+    private List<List<String>> selectInstruction(
+        IRInstruction instr,
+        Map<String, Integer> v_reg_to_off,
+        Map<String, String> v_reg_to_arch_reg,
+        String func_name,
+        int spOffset) 
+    {
+        
         List<List<String>>list = new ArrayList<>();
         String op = instr.opCode.name();
         String tpl = TEMPLATES.get(op);
-        boolean is_label = false;
 
         String dst   = "";
         String lhs   = "";
@@ -486,7 +538,7 @@ public class IntraBlockAllocInstructionSelector {
             func = instr.operands[1].toString();
             dst  = instr.operands[0].toString();  
             if (func.equals("geti") || func.equals("getf") || func.equals("getc")) {
-                getSyscalls(list, v_reg_to_off, func, dst);
+                getSyscalls(list, v_reg_to_off, v_reg_to_arch_reg, func, dst);
                 return list;
             }
         }
@@ -494,17 +546,17 @@ public class IntraBlockAllocInstructionSelector {
             func = instr.operands[0].toString();
             lhs = instr.operands[1].toString();
             if (func.equals("puti") || func.equals("putf") || func.equals("putc")) {
-                putSyscalls(list, v_reg_to_off, func, lhs);
+                putSyscalls(list, v_reg_to_off, v_reg_to_arch_reg, func, lhs);
                 return list;
             }
         }
 
         switch (instr.opCode) {
             case ADD: case SUB: case MULT: case DIV: case AND: case OR:
-                arithAndLogicInstr(list, v_reg_to_off, instr);
+                arithAndLogicInstr(list, v_reg_to_off, v_reg_to_arch_reg, instr);
                 return list;
             case ASSIGN:
-                assignInstr(list, v_reg_to_off, instr);
+                assignInstr(list, v_reg_to_off, v_reg_to_arch_reg, instr);
                 return list;
             case GOTO:
                 label = instr.operands[0].toString();
@@ -512,26 +564,27 @@ public class IntraBlockAllocInstructionSelector {
                 createLines(list, "j ${label}", "", "", "", local_label, "", "", "", "");
                 return list;
             case BRNEQ: case BRLT: case BRGT: case BRLEQ: case BRGEQ: case BREQ:
-                branchInstr(list, v_reg_to_off, instr, func_name);
+                branchInstr(list, v_reg_to_off, v_reg_to_arch_reg, instr, func_name);
                 return list;
             case ARRAY_LOAD:
-                arrayLoadInstr(list, v_reg_to_off, instr);
+                arrayLoadInstr(list, v_reg_to_off, v_reg_to_arch_reg, instr);
                 return list;
             case ARRAY_STORE:
-                arrayStoreInstr(list, v_reg_to_off, instr);
+                arrayStoreInstr(list, v_reg_to_off, v_reg_to_arch_reg, instr);
                 return list;
             case CALL:
-                callInstr(list, v_reg_to_off, instr);
+                callInstr(list, v_reg_to_off, v_reg_to_arch_reg, instr);
                 return list;
             case CALLR:
-                callrInstr(list, v_reg_to_off, instr);
+                callrInstr(list, v_reg_to_off, v_reg_to_arch_reg, instr);
                 return list;
             case RETURN:
                 String retval = instr.operands[0].toString();
                 if (isNumeric(retval)){ // If offset is numeric, store it in a temp register
                     li(list, "$v0", retval);
                 } else {
-                    loadVirtualRegister(list, "$v0", retval, v_reg_to_off);
+                    // loadVirtualRegister(list, "$v0", retval, v_reg_to_off);
+                    moveToArchReg(list, "$v0", retval, v_reg_to_off, v_reg_to_arch_reg);
                 }
                 createLines(list, "addi $sp, $sp, ${offset}","","","","","","","",Integer.toString(spOffset));
                 createLines(list, "jr $ra", dst, lhs, rhs, label, func, base, src, offset);
@@ -860,7 +913,7 @@ public class IntraBlockAllocInstructionSelector {
                 
                 // translate instructions in block
                 for (IRInstruction instr : block) {
-                    List<List<String>> list = selectInstruction(instr, v_reg_to_off, current_func, offset);
+                    List<List<String>> list = selectInstruction(instr, v_reg_to_off, v_reg_to_arch_reg, current_func, offset);
                     for (List<String> instruction : list){
                         mips.addAll(instruction);
                     }
