@@ -9,5 +9,9 @@ run: all
 	# @java -cp bin/ Main public_test_cases/prime.ir
 
 	# ./run.sh 
+
+test: all
+	./run_test.sh
+
 clean:
 	@rm -rf bin

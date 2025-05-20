@@ -861,12 +861,12 @@ public class InstructionSelector {
         Files.write(Paths.get(path), lines);
     }
 
-    public static void main(String[] args) throws IOException, IRException {
-        IRProgram prog = new IRReader().parseIRFile(args[0]);
-        InstructionSelector is = new InstructionSelector();
-        List<String> mips = is.instructionSelection(prog);
-        // List<String> mips = instructionSelection(prog);
-        writeMipsToFile(mips, "out.s");
-        System.out.println("Generated " + mips.size() + " MIPS lines to out.s");
-    }
+    // public static void main(String[] args) throws IOException, IRException {
+    //     IRProgram prog = new IRReader().parseIRFile(args[0]);
+    //     InstructionSelector is = new InstructionSelector();
+    //     List<String> mips = is.instructionSelection(prog);
+    //     // List<String> mips = instructionSelection(prog);
+    //     writeMipsToFile(mips, "out.s");
+    //     System.out.println("Generated " + mips.size() + " MIPS lines to out.s");
+    // }
 }
