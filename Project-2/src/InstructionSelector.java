@@ -373,7 +373,7 @@ public class InstructionSelector {
             loadVirtualRegister(list, _default_dest, value, v_reg_to_off);      // lw  $t0, …
 
         /* 3.  counter i ← 0  ( $t1 ) */
-        li(list, _default_lhs, "0");                                            // li  $t1, 0
+        li(list, _default_lhs, "0");                                        // li  $t1, 0
 
         /* 4.  prepare loop labels */
         String loopLbl = "arr_init_loop_" + current_func + "_" + array;
@@ -401,6 +401,11 @@ public class InstructionSelector {
         createLines(list, "sw ${src}, 0(${base})",
                     "", "", "", "", "", "$t4", _default_dest, "");
 
+        // loadVirtualRegister(list, _default_dest, dst, v_reg_to_off);
+
+        // // sw src, 0($t)          # store word to address
+        // // offset = offset;
+        // createLines(list, "sw ${dst}, 0(${base})", _default_dest, "", "", "", "", _default_lhs, "", "");
         /* i += 1 */
         createLines(list, "addi ${dst}, ${src}, 1",
                     _default_lhs, _default_lhs, "", "", "", "", "", "");
@@ -656,11 +661,9 @@ public class InstructionSelector {
                     /* array-initialisation  A, N, v  */
                     arrayStoreVal(list, v_reg_to_off, instr);
 
-                }/*  else {
-                    throw new IRException(
-                        "ASSIGN expects 2 (scalar) or 3 (array) operands, got "
-                        + instr.operands.length);
-                } */
+                } else {
+                    createLines(list, "error", dst, lhs, rhs, label, func, base, src, offset);
+                }
                 return list;
             case GOTO:
                 label = instr.operands[0].toString();
