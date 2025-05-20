@@ -458,32 +458,32 @@ public class InstructionSelector {
     }
 
     private void getSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, String func, String dst) {
-        createLines(list,  "addi $sp, $sp, -4", "", "", "", "", "", "", "", "");
-        createLines(list,  "sw $v0, 0($sp)", "", "", "", "", "", "", "", "");
+        // createLines(list,  "addi $sp, $sp, -4", "", "", "", "", "", "", "", "");
+        // createLines(list,  "sw $v0, 0($sp)", "", "", "", "", "", "", "", "");
         
         if (func.equals("geti")) {
             createLines(list, "li $v0, 5", "li", "", "", "", "", "", "", "");
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
-            storeVirtualRegister(list, "$v0", dst, v_reg_to_off);
+            
         }
         else if (func.equals("getf")) {
             createLines(list, "li $v0, 6", "", "", "", "", "", "", "", "");
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
-            storeVirtualRegister(list, "$v0", dst, v_reg_to_off);
         }
         else if (func.equals("getc")) {
             createLines(list, "li $v0, 12", "", "", "", "", "", "", "", "");
             createLines(list, "syscall", "", "", "", "", "", "", "", "");
-            storeVirtualRegister(list, "$v0", dst, v_reg_to_off);
         }
 
-        createLines(list,  "lw $v0, 0($sp)", "", "", "", "", "", "", "", "");
-        createLines(list,  "addi $sp, $sp, 4", "", "", "", "", "", "", "", "");
+        // createLines(list,  "lw $v0, 0($sp)", "", "", "", "", "", "", "", "");
+        // createLines(list,  "addi $sp, $sp, 4", "", "", "", "", "", "", "", "");
+
+        storeVirtualRegister(list, "$v0", dst, v_reg_to_off);
     }
 
     private void putSyscalls(List<List<String>>list, Map<String, Integer> v_reg_to_off, String func, String arg) {
-        createLines(list,  "addi $sp, $sp, -8", "", "", "", "", "", "", "", "");
-        createLines(list,  "sw $v0, 4($sp)", "", "", "", "", "", "", "", "");
+        // createLines(list,  "addi $sp, $sp, -8", "", "", "", "", "", "", "", "");
+        // createLines(list,  "sw $v0, 4($sp)", "", "", "", "", "", "", "", "");
         
         if (func.equals("puti")) {
             createLines(list,  "sw $a0, 0($sp)", "", "", "", "", "", "", "", "");
@@ -525,8 +525,8 @@ public class InstructionSelector {
             createLines(list,  "lw $a0, 0($sp)", "", "", "", "", "", "", "", "");
         }
 
-        createLines(list,  "lw $v0, 4($sp)", "", "", "", "", "", "", "", "");
-        createLines(list,  "addi $sp, $sp, 8", "", "", "", "", "", "", "", "");
+        // createLines(list,  "lw $v0, 4($sp)", "", "", "", "", "", "", "", "");
+        // createLines(list,  "addi $sp, $sp, 8", "", "", "", "", "", "", "", "");
     }
 
     private List<List<String>> selectInstruction(IRInstruction instr, Map<String, Integer> v_reg_to_off, String func_name, int spOffset) {
@@ -721,6 +721,11 @@ public class InstructionSelector {
         // give variables (int-list/float-list) designated spots on the stack
         List<IRVariableOperand> vars = func.variables;
         for (int i = 0; i < func.variables.size(); i++) {
+            String v = vars.get(i).getName();
+
+            if (map.containsKey(v))
+                continue;
+            
             IRType type = vars.get(i).type;
             if (type instanceof IRArrayType) {
                 int elems = ((IRArrayType) type).getSize();
@@ -733,11 +738,6 @@ public class InstructionSelector {
                 offset -= MIPSInstruction.WORD_SIZE;
                 continue;
             }
-
-            String v = vars.get(i).getName();
-
-            if (map.containsKey(v))
-                continue;
 
             map.put(v, offset);
             offset -= MIPSInstruction.WORD_SIZE;
