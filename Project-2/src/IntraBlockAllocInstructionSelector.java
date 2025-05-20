@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.lang.foreign.Linker.Option;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -49,6 +50,20 @@ public class IntraBlockAllocInstructionSelector {
     private String current_func = "";
     private Map<String, String> func_to_array = new HashMap<>();
     private Map<String, String> array_to_stack = new HashMap<>();
+
+    // registers to be used in register allocation scheme
+    private static final List<String> REGISTERS = new ArrayList<String>();
+    static {
+        REGISTERS.add("$t3");
+        REGISTERS.add("$t4");
+        REGISTERS.add("$t5");
+        REGISTERS.add("$t6");
+        REGISTERS.add("$t7");
+        REGISTERS.add("$t8");
+        REGISTERS.add("$t9");
+    }
+
+    // private
 
     private static final Map<String, String> TEMPLATES = new HashMap<>();
     static {
@@ -612,23 +627,186 @@ public class IntraBlockAllocInstructionSelector {
         return size * 4;
     }
 
+
+    private static boolean isBranch(IRInstruction instr) {
+        switch(instr.opCode) {
+            case BREQ:
+            case BRNEQ:
+            case BRLT:
+            case BRGT:
+            case BRLEQ:
+            case BRGEQ:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isLabel(IRInstruction instr) {
+        return instr.opCode == IRInstruction.OpCode.LABEL;
+    }
+
+    private static boolean isHeader(int i, List<IRInstruction> instrs){
+        return (i == 0) || isLabel(instrs.get(i)) || (isBranch(instrs.get(i - 1)));
+    }
+
+    private List<List<IRInstruction>> getBasicBlocks(List<IRInstruction> func_instrs) {
+        assert func_instrs.size() > 0;
+        
+        List<List<IRInstruction>> basic_blocks = new ArrayList<List<IRInstruction>>();
+
+        // find the basic blocks by identifying headers
+        List<IRInstruction> curr_block = new ArrayList<>();
+        curr_block.add(func_instrs.get(0)); // add entry instr to first basic block
+        for (int i = 1; i < func_instrs.size(); i++) {
+            IRInstruction inst = func_instrs.get(i);
+
+            if (!isHeader(i, func_instrs)) {
+                curr_block.add(inst);
+                continue;
+            }
+
+            basic_blocks.add(curr_block);
+            
+            curr_block = new ArrayList<>();
+            curr_block.add(inst);
+        }
+        basic_blocks.add(curr_block);
+
+        return basic_blocks;
+    }
+
+
+    private List<String> getReadOperands(IRInstruction instr) {
+        List<String> ops = new ArrayList<>();
+        
+        switch (instr.opCode) {
+            case ASSIGN:
+                if (instr.operands.length == 2) { // variable assign (Tiger IR page 3)
+                    ops.add(instr.operands[1].toString());
+                } else { // array assign (Tiger IR page 5) (assume we're not allocating registers for this)
+                    return ops;
+                }
+                break;
+            case ADD: case SUB: case MULT: case DIV: case AND: case OR:
+            case BREQ: case BRNEQ: case BRLT: case BRGT: case BRLEQ: case BRGEQ:
+                ops.add(instr.operands[1].toString());
+                ops.add(instr.operands[2].toString());
+                break;
+            case RETURN:
+                ops.add(instr.operands[0].toString());
+                break;
+            case CALL:
+                for (int i = 1; i < instr.operands.length; i++) {
+                    ops.add(instr.operands[i].toString());
+                }
+                break;
+            case CALLR:
+                for (int i = 2; i < instr.operands.length; i++) {
+                    IROperand temp = instr.operands[i];
+                    ops.add(temp.toString());
+                }
+                break;
+            case ARRAY_STORE:
+                ops.add(instr.operands[0].toString());
+                break;
+            case ARRAY_LOAD:
+            case LABEL:
+            case GOTO:
+                break;
+        }
+
+        return ops;
+    }
+
+    private Optional<String> getDestOperand(IRInstruction instr) {
+        switch (instr.opCode) {
+            case ASSIGN:
+                if (instr.operands.length == 2) { // variable assign (Tiger IR page 3)
+                    return Optional.of(instr.operands[0].toString());
+                } else { // array assign (Tiger IR page 5) (assume we're not allocating registers for this)
+                    return Optional.empty();
+                }
+            case ADD: case SUB: case MULT: case DIV: case AND: case OR:
+            case BREQ: case BRNEQ: case BRLT: case BRGT: case BRLEQ: case BRGEQ:
+            case RETURN:
+            case CALLR:
+            case ARRAY_LOAD:
+                return Optional.of(instr.operands[0].toString());
+            case CALL:
+            case ARRAY_STORE:
+            case LABEL:
+            case GOTO:
+        }
+        return Optional.empty();
+    }
+
+    private Map<String, Integer> getLifetimes(List<IRInstruction> block) {
+        Map<String, Integer> lifetimes = new HashMap<>();
+        Set<String> live_vars = new HashSet<>();
+
+        for (int i = block.size() - 1; i >= 0; i--) {
+            IRInstruction instr = block.get(i);
+
+            Optional<String> dest_operand = getDestOperand(instr);
+            if (dest_operand.isPresent()) {
+                live_vars.remove(dest_operand.get());
+            }
+
+            List<String> read_operands = getReadOperands(instr);
+            for (String op : read_operands) {
+                if (isNumeric(op)) {  // only care about virtual registers, not immediates
+                    continue;
+                }
+
+                live_vars.add(op);
+
+                if (!lifetimes.containsKey(op)) {
+                    lifetimes.put(op, 1);
+                }
+            }
+
+            for (Map.Entry<String, Integer> kvpair : lifetimes.entrySet()) {
+                String op = kvpair.getKey();
+                int curr_lifetime = kvpair.getValue();
+                lifetimes.put(op, curr_lifetime + 1);
+            }
+        }
+
+        return lifetimes;
+    }
+
+    List<Map.Entry<String, Integer>> sortLifetimes(Map<String, Integer> lifetimes) {
+        List<Map.Entry<String, Integer>> entryList = new ArrayList<>(lifetimes.entrySet());
+        entryList.sort(Map.Entry.<String, Integer>comparingByValue().reversed());
+        return entryList;
+    }
+
+    private Map<String, String> virtualRegToArchReg(List<IRInstruction> block) {
+        Map<String, Integer> lifetimes = getLifetimes(block);
+        List<Map.Entry<String, Integer>> sorted_lifetimes = sortLifetimes(lifetimes);
+
+        Map<String, String> virt_reg_to_arch_reg = new HashMap<>();
+        for (int i = 0; i < Math.min(sorted_lifetimes.size(), REGISTERS.size()); i++) {
+            String arch_r = REGISTERS.get(i);
+            String virt_reg = sorted_lifetimes.get(i).getKey();
+            virt_reg_to_arch_reg.put(virt_reg, arch_r);
+        }
+
+        return virt_reg_to_arch_reg;
+    }
+
     public List<String> instructionSelection(IRProgram program) {
         List<String> mips = new ArrayList<>();
         mips.add(".text");
         Collections.reverse(program.functions); // to print the main function first
         for (IRFunction fn : program.functions) {
-            T_registers_used_by_func.push(new HashSet<>());
-            S_registers_used_by_func.push(new HashSet<>());
-            registerS_count = 0;
-            registerT_count = 2;
             current_func = fn.name;
-            S_registers.clear();
-            T_registers.clear();
 
             mips.add(fn.name + ":");
             int offset = calculateStackAllocation(fn);
-            // this.fp = this.pc;
-            // this.pc += offset;
+
+            // prologue
             mips.add("  move $fp, $sp");
             mips.add("  addi $sp, $sp, -" + offset);
 
@@ -637,12 +815,20 @@ public class IntraBlockAllocInstructionSelector {
             List<String> arg_loads = loadArguments(fn, v_reg_to_off);
             mips.addAll(arg_loads);
 
-            for (IRInstruction instr : fn.instructions) {
-                List<List<String>> list = selectInstruction(instr, v_reg_to_off, current_func, offset);
-                for (List<String> instruction : list){
-                    mips.addAll(instruction);
+            // translate IR instructions into MIPS
+            List<List<IRInstruction>> basic_blocks = getBasicBlocks(fn.instructions);
+            for (List<IRInstruction> block : basic_blocks) {
+                Map<String, String> v_reg_to_arch_reg = virtualRegToArchReg(block);
+                
+                for (IRInstruction instr : fn.instructions) {
+                    List<List<String>> list = selectInstruction(instr, v_reg_to_off, current_func, offset);
+                    for (List<String> instruction : list){
+                        mips.addAll(instruction);
+                    }
                 }
             }
+
+            // epilogue
             if (fn.name.equals("main")) {
                 mips.add("  li $v0, 10");
                 mips.add("  syscall");
