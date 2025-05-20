@@ -16,4 +16,4 @@
 # Produces out . s
 # ./run.sh public_test_cases/quicksort/quicksort.ir
 
-java -cp bin/ Main $1
+java -cp bin/ Main $1 $2
