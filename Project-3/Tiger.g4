@@ -1,147 +1,225 @@
-// Tiger.g4 – ANTLR4 grammar matching Project 3 specification
-// ----------------------------------------------------
-// File name **must** be Tiger.g4 so the grammar name matches the file name.
+// Tiger.g4 – LL(1) grammar matching Appendix A of Project‑3.pdf
+// ------------------------------------------------------------------
+//  * Save exactly as Tiger.g4 (capital T).
+//  * Combined lexer + parser grammar for ANTLR 4.x (Java target).
+//  * All rules end with ONE semicolon; no duplicates.
 
 grammar Tiger;
 
-// =====================
+// ==================================================================
 // PARSER RULES
-// =====================
+// ==================================================================
 
-// Entry point of the program
+// <tiger‑program> ::= main let <declaration‑segment> in begin <stat‑seq> end EOF
+
 tigerProgram
-    : MAIN LET declarationSegment IN BEGIN statSeq END
+    : MAIN LET declarationSegment IN BEGIN statSeq END EOF
     ;
+
+// ------------------- Declaration segment --------------------------
 
 declarationSegment
-    : (declaration)*
+    : varDeclarationList functDeclarationList
     ;
 
-declaration
-    : varDeclaration
-    | functDeclaration
+varDeclarationList
+    : /* empty */
+    | varDeclaration varDeclarationList
     ;
 
 varDeclaration
-    : idList ':' type (ASSIGN literal)?
+    : VAR idList COLON type optionalInit SEMICOLON
+    ;
+
+optionalInit
+    : /* empty */
+    | ASSIGN constant
+    ;
+
+functDeclarationList
+    : /* empty */
+    | functDeclaration functDeclarationList
     ;
 
 functDeclaration
-    : FUNCTION ID '(' paramList? ')' ':' type BEGIN statSeq END
+    : FUNCTION ID LPAREN paramList? RPAREN retType BEGIN statSeq END
     ;
 
 paramList
-    : param (',' param)*
+    : param ( COMMA param )*
     ;
 
 param
-    : ID ':' type
+    : ID COLON type
     ;
 
+retType
+    : /* empty */
+    | COLON type
+    ;
+
+// ------------------- Types ----------------------------------------
+
 type
+    : typeId
+    | ARRAY LBRACK INTLIT RBRACK OF typeId
+    ;
+
+typeId
     : INTEGER
-    | FLOAT
+    | FLOATTY
     ;
 
 idList
-    : ID (',' ID)*
+    : ID ( COMMA ID )*
     ;
+
+// ------------------- Statement sequence ---------------------------
 
 statSeq
-    : (statement)*
+    : ( stat )+
     ;
 
-statement
-    : assignStat
-    | ifStat
-    | whileStat
-    | forStat
-    | funcCallStat
-    | returnStat
+// ------------------- Individual statements ------------------------
+
+stat
+    : lvalue ASSIGN expr SEMICOLON                               # assignStat
+    | IF expr THEN statSeq ENDIF SEMICOLON                        # ifNoElse
+    | IF expr THEN statSeq ELSE statSeq ENDIF SEMICOLON           # ifWithElse
+    | WHILE expr DO statSeq ENDDO SEMICOLON                       # whileStat
+    | FOR ID ASSIGN expr TO expr DO statSeq ENDDO SEMICOLON       # forStat
+    | funcCallWithOptPrefix SEMICOLON                             # funcCallStat
+    | BREAK SEMICOLON                                             # breakStat
+    | RETURN expr SEMICOLON                                       # returnStat
+    | LET declarationSegment IN statSeq END                       # letBlockStat
     ;
 
-assignStat
-    : ID ASSIGN expr
+// optional "lvalue :=" prefix used in function calls
+optPrefix
+    : lvalue ASSIGN
     ;
 
-ifStat
-    : IF expr THEN statSeq (ELSE statSeq)? ENDIF
+funcCallWithOptPrefix
+    : optPrefix? ID LPAREN exprList? RPAREN
     ;
 
-whileStat
-    : WHILE expr DO statSeq ENDDO
-    ;
-
-forStat
-    : FOR ID ASSIGN expr TO expr DO statSeq ENDDO
-    ;
-
-funcCallStat
-    : ID '(' exprList? ')'
-    ;
-
-returnStat
-    : RETURN expr
-    ;
+// ------------------- Expression list ------------------------------
 
 exprList
-    : expr (',' expr)*
+    : expr ( COMMA expr )*
     ;
+
+// ------------------- Expressions & precedence ---------------------
+// order: ( ) > * / > + - > comparisons > & > |
 
 expr
-    : expr ('*'|'/') expr      # MulDivExpr
-    | expr ('+'|'-') expr      # AddSubExpr
-    | '(' expr ')'             # ParensExpr
-    | ID                       # IdExpr
-    | literal                  # LiteralExpr
-    | funcCallStat             # FuncCallExpr
+    : lvalue ASSIGN expr              # assignExpr
+    | orExpr                          # topLevel
     ;
 
-literal
+orExpr
+    : andExpr ( OR andExpr )*         # orChain
+    ;
+
+andExpr
+    : compExpr ( AND compExpr )*      # andChain
+    ;
+
+compExpr
+    : addExpr ( compOp addExpr )?     # compare
+    ;
+
+addExpr
+    : mulExpr ( addOp mulExpr )*      # addSub
+    ;
+
+mulExpr
+    : unaryExpr ( mulOp unaryExpr )*  # mulDiv
+    ;
+
+unaryExpr
+    : MINUS unaryExpr                 # negate
+    | primaryExpr                     # prim
+    ;
+
+primaryExpr
+    : constant                        # constLit
+    | lvalue                          # lVal
+    | LPAREN expr RPAREN              # parenExpr
+    | funcCallWithOptPrefix           # funcCallExpr
+    ;
+
+lvalue
+    : ID ( LBRACK expr RBRACK )?      # arrayIndex
+    ;
+
+// ------------------- Helpers --------------------------------------
+
+constant
     : INTLIT
     | FLOATLIT
     ;
 
-// =====================
+compOp : EQ | NEQ | LT | GT | LE | GE ;
+addOp  : PLUS | MINUS ;
+mulOp  : TIMES | DIV ;
+
+// ==================================================================
 // LEXER RULES
-// =====================
+// ==================================================================
 
-// Keywords
-MAIN    : 'main';
-LET     : 'let';
-IN      : 'in';
-BEGIN   : 'begin';
-END     : 'end';
-ENDIF   : 'endif';
-WHILE   : 'while';
-DO      : 'do';
-ENDDO   : 'enddo';
-FOR     : 'for';
-TO      : 'to';
-IF      : 'if';
-THEN    : 'then';
-ELSE    : 'else';
-RETURN  : 'return';
-INTEGER : 'int';
-FLOAT   : 'float';
-FUNCTION: 'function';
+// --- Keywords ---
+MAIN      : 'main';
+VAR       : 'var';
+ARRAY     : 'array';
+FUNCTION  : 'function';
+LET       : 'let';
+IN        : 'in';
+BEGIN     : 'begin';
+END       : 'end';
+IF        : 'if';
+THEN      : 'then';
+ELSE      : 'else';
+WHILE     : 'while';
+DO        : 'do';
+ENDDO     : 'enddo';
+FOR       : 'for';
+TO        : 'to';
+BREAK     : 'break';
+RETURN    : 'return';
+ENDIF     : 'endif';
+INTEGER   : 'int';
+FLOATTY   : 'float';
+OF        : 'of';
 
-// Literals
-INTLIT     : [0-9]+;
-FLOATLIT   : [0-9]+ '.' [0-9]+;
-ID         : [a-zA-Z_] [a-zA-Z0-9_]*;
-
-// Operators and symbols
-ASSIGN : ':=';
-
-// Punctuation
-LPAREN : '(';
-RPAREN : ')';
-COMMA  : ',';
-COLON  : ':';
+// --- Symbols & operators ---
+ASSIGN    : ':=';
+PLUS      : '+';
+MINUS     : '-';
+TIMES     : '*';
+DIV       : '/';
+EQ        : '=';
+NEQ       : '<>';
+LT        : '<';
+GT        : '>';
+LE        : '<=';
+GE        : '>=';
+AND       : '&';
+OR        : '|';
+COMMA     : ',';
+COLON     : ':';
 SEMICOLON : ';';
+LPAREN    : '(';
+RPAREN    : ')';
+LBRACK    : '[';
+RBRACK    : ']';
 
-// Whitespace and comments
-WS      : [ \t\r\n]+ -> skip;
-COMMENT : '/*' .*? '*/' -> skip;
-LINE_COMMENT : '//' ~[\r\n]* -> skip;
+// --- Identifiers & literals ---
+ID        : [A-Za-z] [A-Za-z0-9_]* ;
+INTLIT    : [0-9]+ ;
+FLOATLIT  : [0-9]+ '.' [0-9]+ ;
+
+// --- Whitespace & comments ---
+WS            : [ \t\r\n]+ -> skip ;
+COMMENT       : '/*' .*? '*/' -> skip ;
+LINE_COMMENT  : '//' ~[\r\n]* -> skip ;
