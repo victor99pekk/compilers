@@ -333,17 +333,17 @@ public interface TigerListener extends ParseTreeListener {
 	 */
 	void exitAndChain(TigerParser.AndChainContext ctx);
 	/**
-	 * Enter a parse tree produced by the {@code compare}
+	 * Enter a parse tree produced by the {@code compareChain}
 	 * labeled alternative in {@link TigerParser#compExpr}.
 	 * @param ctx the parse tree
 	 */
-	void enterCompare(TigerParser.CompareContext ctx);
+	void enterCompareChain(TigerParser.CompareChainContext ctx);
 	/**
-	 * Exit a parse tree produced by the {@code compare}
+	 * Exit a parse tree produced by the {@code compareChain}
 	 * labeled alternative in {@link TigerParser#compExpr}.
 	 * @param ctx the parse tree
 	 */
-	void exitCompare(TigerParser.CompareContext ctx);
+	void exitCompareChain(TigerParser.CompareChainContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code addSub}
 	 * labeled alternative in {@link TigerParser#addExpr}.

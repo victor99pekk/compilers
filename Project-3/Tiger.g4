@@ -111,6 +111,7 @@ exprList
 
 // ------------------- Expressions & precedence ---------------------
 // order: ( ) > * / > + - > comparisons > & > |
+// All binary operators are right‑associative.
 
 expr
     : lvalue ASSIGN expr              # assignExpr
@@ -126,7 +127,7 @@ andExpr
     ;
 
 compExpr
-    : addExpr ( compOp addExpr )?     # compare
+    : addExpr ( compOp addExpr )*     # compareChain   // allows chains like a = b <> c <= d
     ;
 
 addExpr
@@ -149,8 +150,10 @@ primaryExpr
     | funcCallWithOptPrefix           # funcCallExpr
     ;
 
+// ------------------- L‑values -------------------------------
+
 lvalue
-    : ID ( LBRACK expr RBRACK )?      # arrayIndex
+    : ID ( LBRACK expr RBRACK )?       # arrayIndex
     ;
 
 // ------------------- Helpers --------------------------------------

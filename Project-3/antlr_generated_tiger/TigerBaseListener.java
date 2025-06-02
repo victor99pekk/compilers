@@ -376,13 +376,13 @@ public class TigerBaseListener implements TigerListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterCompare(TigerParser.CompareContext ctx) { }
+	@Override public void enterCompareChain(TigerParser.CompareChainContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitCompare(TigerParser.CompareContext ctx) { }
+	@Override public void exitCompareChain(TigerParser.CompareChainContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
