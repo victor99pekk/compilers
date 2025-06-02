@@ -23,7 +23,7 @@ public class Main {
         parser.addErrorListener(err);
 
         // 4. Invoke the top-level rule in the grammar
-        parser.program();      // start rule is 'program'
+        parser.tigerProgram();      // start rule is 'program'
 
         // 5. Print result
         if (!err.hasErrors()) {

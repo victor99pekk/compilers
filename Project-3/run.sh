@@ -14,8 +14,8 @@ JAR="lib/antlr-4.12.0-complete.jar"
 GEN_DIR="antlr_generated_tiger"
 
 # 1. Regenerate lexer & parser (overwrite $GEN_DIR)
-# rm -rf "$GEN_DIR"
-# java -jar "$JAR" -Dlanguage=Java -o "$GEN_DIR" Tiger.g4 || { echo "ANTLR generation failed."; exit 1; }
+rm -rf "$GEN_DIR"
+java -jar "$JAR" -Dlanguage=Java -o "$GEN_DIR" Tiger.g4 || { echo "ANTLR generation failed."; exit 1; }
 
 # 2. Compile all Java sources
 # Option A: output .class files into project root (-d .)  ⬇️ recommended (simpler run class-path)
